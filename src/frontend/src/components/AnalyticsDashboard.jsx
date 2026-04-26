@@ -1,0 +1,134 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
+  PieChart, Pie, LineChart, Line 
+} from 'recharts';
+import { fetchAnalytics } from '../services/api';
+
+/**
+ * 📊 AnalyticsDashboard: Production-Grade Monitoring.
+ * Enhanced with Intent Distribution, Sentiment Trends, and Accuracy Metrics.
+ */
+const AnalyticsDashboard = () => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetchAnalytics();
+        setData(response);
+      } catch (err) {
+        setError(err.message || 'System Offline');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) return <div className="empty-state">SYNCING...</div>;
+  if (error) return <div className="empty-state">{error}</div>;
+  if (!data || data.total === 0) return <div className="empty-state">NO SYSTEM TELEMETRY YET.</div>;
+
+  // Formatting data for Recharts
+  const barData = Object.keys(data.intents).map(key => ({
+    name: key.split('_').map(w => w[0].toUpperCase()).join(''), 
+    fullName: key.replace('_', ' '),
+    count: data.intents[key]
+  }));
+
+  const pieData = Object.keys(data.intents).map(key => ({
+    name: key,
+    value: data.intents[key]
+  }));
+
+  const timelineData = (data.timeline || []).map((p, i) => ({
+    index: i,
+    sentiment: (p.s * 100).toFixed(0)
+  }));
+
+  const COLORS = ['#3b82f6', '#60a5fa', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'];
+
+  return (
+    <div className="chat-window" style={{ overflowY: 'auto' }}>
+      <div className="dashboard-header" style={{ padding: '24px 24px 0' }}>
+        <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#f8fafc', margin: 0 }}>System Intelligence Dashboard</h2>
+        <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '4px' }}>Real-time telemetry from Neural Link v3.0</p>
+      </div>
+
+      <div className="dashboard-view" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', padding: '20px' }}>
+        <div className="stat-card">
+          <span className="stat-val">{data.total}</span>
+          <span className="stat-label">Total Messages</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-val" style={{ color: '#10b981' }}>{(data.accuracy * 100).toFixed(0)}%</span>
+          <span className="stat-label">Model Accuracy</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-val" style={{ color: '#8b5cf6' }}>{data.avg_conv_length}</span>
+          <span className="stat-label">Avg Conv Length</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-val" style={{ color: '#38bdf8' }}>{data.avg_sentiment}</span>
+          <span className="stat-label">Avg Sentiment</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-val" style={{ color: data.escalations > 0 ? '#f43f5e' : '#64748b' }}>{data.escalations}</span>
+          <span className="stat-label">Active Escalations</span>
+        </div>
+      </div>
+
+      <div style={{ padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        
+        {/* Row 1: Intent Dist & Sentiment Trend */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', minHeight: '240px' }}>
+          <div className="stat-card" style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <h4 style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Intent Distribution</h4>
+            <ResponsiveContainer width="100%" height="85%">
+              <PieChart>
+                <Pie data={pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">
+                  {pieData.map((entry, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: '#020617', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '0.7rem' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="stat-card" style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <h4 style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Satisfaction Velocity</h4>
+            <ResponsiveContainer width="100%" height="85%">
+              <LineChart data={timelineData}>
+                <Tooltip contentStyle={{ backgroundColor: '#020617', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '0.7rem' }} />
+                <Line type="monotone" dataKey="sentiment" stroke="#10b981" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Row 2: Detailed Intent Chart */}
+        <div className="stat-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h4 style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.05em' }}>Neural Link Stability (By Intent)</h4>
+          <div style={{ height: '180px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={barData}>
+                <XAxis dataKey="name" axisLine={false} tickLine={false} style={{ fontSize: '0.6rem', fill: '#64748b' }} />
+                <Tooltip 
+                  cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }} 
+                  contentStyle={{ backgroundColor: '#020617', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '0.7rem' }} 
+                />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                  {barData.map((entry, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AnalyticsDashboard;

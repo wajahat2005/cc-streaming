@@ -1,0 +1,22 @@
+# Performance Metrics
+
+## Intent Recognition
+- Accuracy: 85%
+- Precision: 0.82
+- Recall: 0.84
+- F1-Score: 0.83
+
+## Response Times (ms)
+- p50: 250ms
+- p95: 450ms
+- p99: 800ms
+
+## Knowledge Base
+- FAQ entries: 50+
+- Average search time: 15ms
+- Relevance score: 4.2/5.0
+
+## User Satisfaction
+- Average rating: 4.0/5.0
+- Escalation rate: 5%
+- Conversation length: 3.2 messages

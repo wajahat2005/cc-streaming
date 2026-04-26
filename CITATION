@@ -1,0 +1,25 @@
+# Citation
+
+If you use this project in your research or academic work, please cite:
+
+```
+AI-Powered Customer Support Chatbot with Intent Recognition
+Cloud Computing Final Year Project
+Apache OpenNLP + Apache Lucene + Apache Kafka
+
+@software{chatbot2026,
+  author = {Project Group 10},
+  title = {AI-Powered Customer Support Chatbot},
+  year = {2026},
+  url = {https://github.com/your-repo/cc-project-group10},
+  license = {MIT}
+}
+```
+
+## Acknowledgments
+
+- Apache OpenNLP for natural language processing
+- Apache Lucene for full-text search
+- Apache Kafka for message streaming
+- FastAPI for the Python backend
+- React for the frontend interface

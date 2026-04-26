@@ -1,0 +1,215 @@
+{
+  "intents": [
+    {
+      "tag": "greeting",
+      "patterns": [
+        "hi", "hello", "hey", "good morning", "good evening", "howdy", "hello there", 
+        "hi there", "greetings", "good afternoon", "hiya", "what's up", "yo", 
+        "anyone there", "hello bot", "heyyo", "whussup", "gm", "ge", "ga", 
+        "is anyone home", "hey assistant", "sup", "hi friendly bot",
+        "how are you", "how are things", "how's it going", "kia hal hai", "kya haal hai",
+        "hola", "ola", "namaste", "salaam", "asalam-o-alaikum"
+      ],
+      "responses": [
+        "Hello! How can I help you today?", 
+        "Hi there! What can I do for you?", 
+        "Greetings! How may I assist you?"
+      ]
+    },
+    {
+      "tag": "goodbye",
+      "patterns": [
+        "bye", "goodbye", "see you later", "catch you later", "bye bye", "I am leaving", 
+        "talk to you later", "have a good one", "see ya", "good night", "adios", 
+        "leaving now", "cya", "farewell", "take care", "gnight", "gotta go", 
+        "peace out", "talk soon", "i'm off", "end chat", "bye for now"
+      ],
+      "responses": [
+        "Goodbye! Have a great day!", 
+        "See you later! Feel free to chat if you need anything else.", 
+        "Take care and goodbye!"
+      ]
+    },
+    {
+      "tag": "thanks",
+      "patterns": [
+        "thanks", "thank you", "thanks a lot", "thank you very much", "appreciate it", 
+        "thanks for helping", "many thanks", "thank u", "thx", "i appreciate your help", 
+        "that's helpful", "awesome thanks", "thanks a bunch", "great thanks", "thankyou",
+        "cheers", "thanks mate", "big thanks", "you saved me", "really helpful", "tysm"
+      ],
+      "responses": [
+        "You're welcome!", 
+        "Anytime!", 
+        "Glad I could help!", 
+        "Happy to assist!"
+      ]
+    },
+    {
+      "tag": "capabilities",
+      "patterns": [
+        "what can you do",
+        "help",
+        "features",
+        "services",
+        "how can you help",
+        "what do you help with",
+        "what services do you offer",
+        "what are your features"
+      ],
+      "responses": [
+        "I can help with order tracking, product recommendations, refunds, store information, and support requests.",
+        "I can assist with orders, products, payments, refunds, and general support questions.",
+        "I help with tracking orders, suggesting products, answering store questions, and routing support issues."
+      ]
+    },
+    {
+      "tag": "order_tracking",
+      "patterns": [
+        "track order",
+        "where is my parcel",
+        "order delivery status",
+        "track shipment",
+        "my package location",
+        "track my order", "where is my order", "order status", "how to track order", 
+        "where's my package", "is my order shipped", "track my package", 
+        "when will my order arrive", "shipping status", 
+        "my order location", "wher is my order", "trk my order", "can you track my order", 
+        "check order status", "parcel location", "tracking info", "shipment update", 
+        "delivery progress", "tracking id", "has it arrived yet", 
+        "package tracker", "where is my box", "show me my shipping", "is my stuff here",
+        "mera order kidher hai", "parcel kahan hai", "order tracking", "find my order"
+      ],
+      "responses": [
+        "Please provide your order ID to check the status.", 
+        "I can help with that! What's your order number?", 
+        "Sure, enter your 4-digit or more order ID."
+      ]
+    },
+    {
+      "tag": "complaint",
+      "patterns": [
+        "this is bad", "I am not happy", "terrible service", "horrible experience", 
+        "I want to complain", "unacceptable", "very disappointed", "frustrating service", 
+        "bad product", "i'm extremely unhappy", "worst service ever", "this sucks", 
+        "dissatisfied", "awful experience", "i have a complaint", "i'm angry", "this is rubbish", 
+        "total waste of money", "poor quality", "fix this now", "broke on arrival", 
+        "not what i ordered", "extremely frustrated", "i want to speak to a manager"
+      ],
+      "responses": [
+        "I deeply apologize for the inconvenience. Please tell me more so I can resolve this.", 
+        "I'm very sorry you had a bad experience. Let me connect you with support.", 
+        "We regret that you are unhappy. What went wrong?"
+      ]
+    },
+    {
+      "tag": "product_recommendation",
+      "patterns": [
+        "recommend a product", "what should I buy", "product suggestions", 
+        "any recommendations", "what do you recommend", "can you suggest something", 
+        "best products", "popular items", "what is trending", "suggest an item", 
+        "top rated products", "good stuff to buy", "show me recommendations", 
+        "give me some ideas", "best seller products", "gift ideas", "what is good today", 
+        "trending gadgets", "popular gear", "suggest some gifts", "what's the best seller"
+      ],
+      "responses": [
+        "We have a variety of popular items! What category are you interested in?", 
+        "I'd love to help you find something. Are you looking for electronics, clothing, or home goods?", 
+        "Check out our best sellers on the homepage!"
+      ]
+    },
+    {
+      "tag": "refund_requests",
+      "patterns": [
+        "i want a refund", "how to get my money back", "cancel and refund", 
+        "refund process", "request a refund", "can i get a refund", 
+        "need my money refunded", "process my refund", "unhappy want refund", 
+        "return money", "refund policy", "refund me", "give my money back", 
+        "how do refunds work", "i need a refund", "money back guarantee", 
+        "reimburse me", "repayment", "i want my funds back", "where is my refund"
+      ],
+      "responses": [
+        "I can help you with a refund. Please provide your order ID.", 
+        "Refunds are processed within 5-7 business days. What is your order number?", 
+        "Let's get that refund sorted for you. Could I have your order ID?"
+      ]
+    },
+    {
+      "tag": "office_hours",
+      "patterns": [
+        "what are your hours", "when are you open", "office hours", "business hours", 
+        "are you open on weekends", "closing time", "opening time", 
+        "what time do you open", "what time do you close", "working hours", 
+        "operation hours", "when does the store open", "are you open now", 
+        "timings", "store hours", "weekend schedule", "available times", "working days"
+      ],
+      "responses": [
+        "We are open Monday to Friday, 9 AM to 6 PM.", 
+        "Our business hours are 9 AM - 6 PM on weekdays. We are closed on weekends.", 
+        "We operate from 9 AM to 6 PM (EST) during business days."
+      ]
+    },
+    {
+      "tag": "location",
+      "patterns": [
+        "where are you located", "what is your address", "store location", 
+        "where is your office", "how to reach you", "address details", 
+        "your physical address", "directions to your store", "where is the headquarters", 
+        "location", "find your store", "where r u based", "office address", 
+        "where is the shop", "give me your address", "set directions", "postcode", 
+        "zip code", "head office link", "how do i find you", "nearby stores"
+      ],
+      "responses": [
+        "We are an online-only store by default, but our HQ is 123 Tech Lane, Silicon Valley.", 
+        "You can find us at 123 Tech Lane, CA. We also operate online 24/7.", 
+        "Our main office is located at 123 Tech Lane, Silicon Valley!"
+      ]
+    },
+    {
+      "tag": "payment_methods",
+      "patterns": [
+        "how can i pay", "accepted payment methods", "do you accept credit cards", 
+        "payment options", "can I pay with paypal", "what forms of payment", 
+        "how to pay", "pay by card", "do you take apple pay", "payment methods accepted", 
+        "is cash on delivery available", "payment info", "modes of payment", 
+        "how do i complete payment", "paypal accepted", "bitcoin", "visa or mastercard", 
+        "bank transfer", "how to checkout", "can i pay later"
+      ],
+      "responses": [
+        "We accept Visa, MasterCard, PayPal, and Apple Pay.", 
+        "You can pay using credit/debit cards, PayPal, or Google/Apple Pay.", 
+        "All major credit cards and PayPal are accepted!"
+      ]
+    },
+    {
+      "tag": "shipping_cost",
+      "patterns": [
+        "how much is shipping", "shipping cost", "delivery fee", "is shipping free", 
+        "what are the delivery charges", "shipping price", "cost of delivery", 
+        "what does shipping cost", "freight charges", "do I have to pay for shipping", 
+        "free shipping", "shipping rates", "delivery cost", "estimate shipping", 
+        "fee for shipping", "is there a delivery charge", "shipping quote"
+      ],
+      "responses": [
+        "Shipping is free for orders over $50! Otherwise, it is a flat $5 fee.", 
+        "Standard shipping costs $5. Expedited options are available at checkout.", 
+        "We offer free delivery on large orders; standard is $5."
+      ]
+    },
+    {
+      "tag": "cancel_order",
+      "patterns": [
+        "cancel my order", "how to cancel", "i want to cancel", "stop the shipment", 
+        "cancel purchase", "cancel this", "abort order", "can i cancel my purchase", 
+        "stop my order", "cancellations", "cancel it", "how do i cancel", 
+        "need to cancel", "cancel immediately", "mistake please cancel", 
+        "don't send my order", "i changed my mind", "void my order"
+      ],
+      "responses": [
+        "Orders can be canceled within 1 hour of placing them. Please provide your order ID.", 
+        "To cancel, please provide your order ID. We can cancel it before it ships.", 
+        "If your order hasn't shipped, we can cancel it. What's the order ID?"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+FILE: docs\source_exports\docs\docs__source_exports__backend__backend__core__intent_fallback.py.txt.txt
+COMPONENT: docs
+================================================================================
+FILE: docs\source_exports\backend\backend__core__intent_fallback.py.txt
+COMPONENT: docs
+================================================================================
+FILE: backend\core\intent_fallback.py
+COMPONENT: backend
+================================================================================
+import os
+import pickle
+from functools import lru_cache
+from typing import Tuple, Optional
+
+
+@lru_cache(maxsize=1)
+def _load_model_and_vectorizer():
+    """
+    Loads the local sklearn intent model + TF-IDF vectorizer shipped with this repo.
+    This is used as a fallback when the Java OpenNLP service is unavailable or low-confidence.
+    """
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    model_path = os.path.join(base_dir, "intent_model.pkl")
+    vec_path = os.path.join(base_dir, "vectorizer.pkl")
+
+    if not (os.path.exists(model_path) and os.path.exists(vec_path)):
+        return None, None
+
+    with open(model_path, "rb") as f:
+        model = pickle.load(f)
+    with open(vec_path, "rb") as f:
+        vectorizer = pickle.load(f)
+    return model, vectorizer
+
+
+def predict_intent(text: str) -> Tuple[Optional[str], float]:
+    """
+    Returns (intent, confidence) using the local sklearn classifier.
+    Confidence is max class probability if available, else 0.0.
+    """
+    model, vectorizer = _load_model_and_vectorizer()
+    if model is None or vectorizer is None or not text:
+        return None, 0.0
+
+    X = vectorizer.transform([text])
+    intent = model.predict(X)[0]
+
+    confidence = 0.0
+    if hasattr(model, "predict_proba"):
+        probs = model.predict_proba(X)[0]
+        confidence = float(max(probs)) if len(probs) else 0.0
+
+    return str(intent), confidence
+
+
+
+

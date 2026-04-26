@@ -1,0 +1,163 @@
+package com.wajahat.chatbot;
+
+/**
+ * SearchServer: Java API hub for NLP and Lucene retrieval.
+ * 
+ * This server uses the 'Spark Java' framework to expose REST endpoints.
+ * It coordinates between:
+ * 1. OpenNLP (Intent & Entity Extraction)
+ * 2. Lucene (Fuzzy FAQ Retrieval)
+ */
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.wajahat.chatbot.lucene.Indexer;
+import com.wajahat.chatbot.lucene.Searcher;
+import org.apache.lucene.store.Directory;
+
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Arrays;
+import java.util.ArrayList;
+
+import static spark.Spark.*;
+
+public class SearchServer {
+    // Gson instance for JSON conversion (JSON <-> Java Map/Object)
+    private static final Gson gson = new Gson();
+    // Core NLP Processor instance
+    private static NLPProcessor nlp;
+
+    /**
+     * Main Entry Point: Configures the server and starts listening on port 4567.
+     */
+    public static void main(String[] args) throws Exception {
+
+        // Set the listener port for the microservice
+        int serverPort = 4567;
+        String envPort = System.getenv("PORT");
+        if (envPort != null) {
+            try {
+                serverPort = Integer.parseInt(envPort);
+            } catch (NumberFormatException ignored) {
+                System.err.println("Invalid PORT env var, falling back to 4567: " + envPort);
+            }
+        }
+        port(serverPort);
+        final int finalPort = serverPort;
+
+        // ─── PART 1: Initialization ──────────────────────────────────
+        nlp = new NLPProcessor();
+        
+        // Resolve paths from environment variables (important for Docker compatibility)
+        String modelsDir = System.getenv("MODELS_DIR");
+        if (modelsDir == null) modelsDir = "/app/data/models";
+        
+        // Knowledge base file (mounted into container via docker-compose volume)
+        String kbFile = System.getenv("KB_FILE");
+        if (kbFile == null) kbFile = "/app/data/faq.txt";
+
+        // Use /app/data mapping for container, or a relative local path for IDE debugging
+        String dataDir;
+        if (System.getenv("MODELS_DIR") != null) {
+            dataDir = "/app/data";
+        } else {
+            // When running locally from backend/ai-chatbot, resolve ../data
+            Path localData = Paths.get("").toAbsolutePath().resolve("..").resolve("data").normalize();
+            dataDir = localData.toString();
+        }
+        
+        // ─── PART 2: Auto-Training Logic ──────────────────────────────
+        // Check if the Intent model exists. If not, trigger the OpenNLP training routine.
+        File intentModelFile = new File(modelsDir, "en-intent.bin");
+        if (!intentModelFile.exists()) {
+            try {
+                // Train the Categorizer using our intents.json dataset
+                nlp.trainIntentModel(dataDir + "/intents.json", intentModelFile.getAbsolutePath());
+            } catch (Exception e) {
+                System.err.println("❌ Critical: Failed to train intent model at startup: " + e.getMessage());
+            }
+        }
+
+        // Initialize the Lucene index (Knowledge Base)
+        Directory index = Indexer.createIndex(kbFile);
+        Searcher searcher = new Searcher(index);
+
+        /**
+         * POST /search
+         * The primary endpoint used by the Python Backend.
+         * Combines Intent Prediction, Entity Extraction, and Lucene Retrieval.
+         */
+        post("/search", (req, res) -> {
+            res.type("application/json"); // Set response content type
+            
+            try {
+                // Parse the incoming JSON body
+                JsonObject body = gson.fromJson(req.body(), JsonObject.class);
+                String query = (body != null && body.has("query")) 
+                               ? body.get("query").getAsString() 
+                               : null;
+                               
+                int topK = (body != null && body.has("topK")) 
+                           ? body.get("topK").getAsInt() 
+                           : 1;
+
+                if (query == null || query.trim().isEmpty()) {
+                    res.status(400); // Bad Request
+                    return gson.toJson(Map.of("error", "The 'query' field is required."));
+                }
+
+                // ─── STEP 1: AI Processing (OpenNLP) ────────────────────────
+                String[] tokens = nlp.tokenize(query);
+                NLPProcessor.IntentResult intentRes = nlp.predictIntent(tokens);
+                Map<String, List<String>> entities = nlp.extractEntities(query, tokens);
+                
+                System.out.println("🔍 AI Inference: [" + intentRes.category + "] Conf: " + intentRes.confidence);
+
+                // ─── STEP 2: Knowledge Retrieval (Lucene - Hybrid) ──────────
+                List<String> boosters = new ArrayList<>();
+                entities.values().forEach(boosters::addAll);
+                
+                // Hybrid Search: Pass query tokens, ML intent, and extracted entities
+                List<Map<String, Object>> hits = searcher.search(query.toLowerCase(), intentRes.category, boosters, topK);
+                
+                // ─── STEP 3: Response Construction ──────────────────────────
+                Map<String, Object> response = new HashMap<>();
+                response.put("hits", hits);
+                response.put("intent", intentRes.category);
+                response.put("confidence", intentRes.confidence);
+                response.put("nlp_metadata", Map.of(
+                    "tokens", tokens,
+                    "entities", entities,
+                    "intent", intentRes.category,
+                    "confidence", intentRes.confidence
+                ));
+                
+                return gson.toJson(response);
+
+            } catch (Exception e) {
+                res.status(500); // Internal Error
+                return gson.toJson(Map.of("error", "JVM Error: " + e.getMessage()));
+            }
+        });
+
+        /**
+         * GET /health
+         * Liveness check for Docker/Kubernetes health monitoring.
+         */
+        get("/health", (req, res) -> {
+            res.type("application/json");
+            return gson.toJson(Map.of(
+                "status", nlp.isReady() ? "online" : "initializing",
+                "port", finalPort
+            ));
+        });
+
+        System.out.println("AI service started on port " + serverPort + ".");
+        System.out.println("Models Path: " + modelsDir);
+        System.out.println("KB File: " + kbFile);
+    }
+}

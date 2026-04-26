@@ -1,0 +1,93 @@
+FILE: docs\source_exports\backend\backend__core__session.py.txt
+COMPONENT: docs
+================================================================================
+FILE: backend\core\session.py
+COMPONENT: backend
+================================================================================
+import os
+import json
+import logging
+import backoff
+import redis
+from typing import Optional
+from models.session import SessionData
+
+logger = logging.getLogger(__name__)
+
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+SESSION_TTL = 3600  # 1 hour
+
+class SessionStore:
+    """Production-grade session store with Redis and local fallback logic."""
+    
+    def __init__(self):
+        self.local_cache = {}  # Fallback memory store
+        self._redis = None
+        self._connect()
+
+    def _connect(self):
+        try:
+            self._redis = redis.Redis(
+                host=REDIS_HOST,
+                port=REDIS_PORT,
+                decode_responses=True,
+                socket_timeout=2.0,
+                socket_connect_timeout=2.0
+            )
+            # Ping to verify connection
+            self._redis.ping()
+            logger.info(f"✅ Connected to Redis at {REDIS_HOST}:{REDIS_PORT}")
+        except Exception as e:
+            logger.warning(f"⚠️ Redis unavailable, falling back to in-memory: {e}")
+            self._redis = None
+
+    @backoff.on_exception(backoff.expo, (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError), max_tries=3)
+    def _execute_with_retry(self, func, *args, **kwargs):
+        if not self._redis:
+            return None
+        try:
+            return func(*args, **kwargs)
+        except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError):
+            logger.error("🚨 Redis connection lost during execution.")
+            self._connect() # Try to reconnect
+            raise # Let backoff handle the retry
+
+    def get_session(self, user_id: str) -> SessionData:
+        # 1. Try Redis
+        if self._redis:
+            try:
+                data = self._execute_with_retry(self._redis.get, f"session:{user_id}")
+                if data:
+                    return SessionData.model_validate_json(data)
+            except Exception as e:
+                logger.error(f"Failed to fetch from Redis: {e}")
+
+        # 2. Try Local Cache (if Redis was missed or failed)
+        if user_id in self.local_cache:
+            return self.local_cache[user_id]
+
+        # 3. Create New
+        new_session = SessionData(user_id=user_id)
+        self.save_session(new_session)
+        return new_session
+
+    def save_session(self, session: SessionData):
+        # 1. Save to Local (Always, as a cache)
+        self.local_cache[session.user_id] = session
+        
+        # 2. Try Redis
+        if self._redis:
+            try:
+                self._execute_with_retry(
+                    self._redis.setex, 
+                    f"session:{session.user_id}", 
+                    SESSION_TTL, 
+                    session.model_dump_json()
+                )
+            except Exception as e:
+                logger.error(f"Failed to save to Redis: {e}")
+
+session_manager = SessionStore()
+
+

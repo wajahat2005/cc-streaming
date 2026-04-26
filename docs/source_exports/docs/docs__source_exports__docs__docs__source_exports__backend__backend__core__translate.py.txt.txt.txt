@@ -1,0 +1,117 @@
+FILE: docs\source_exports\docs\docs__source_exports__backend__backend__core__translate.py.txt.txt
+COMPONENT: docs
+================================================================================
+FILE: docs\source_exports\backend\backend__core__translate.py.txt
+COMPONENT: docs
+================================================================================
+FILE: backend\core\translate.py
+COMPONENT: backend
+================================================================================
+import os
+import logging
+from functools import lru_cache
+from typing import Optional, Tuple
+
+from deep_translator import GoogleTranslator
+
+logger = logging.getLogger(__name__)
+
+
+def _norm_lang(code: Optional[str]) -> str:
+    if not code:
+        return "en"
+    code = code.strip().lower()
+    if code in {"auto", "und", "unknown"}:
+        return "auto"
+    # Normalize common formats like en-US -> en
+    if "-" in code:
+        code = code.split("-", 1)[0]
+    return code or "en"
+
+
+@lru_cache(maxsize=1)
+def _translation_enabled() -> bool:
+    # Enabled by default for your requirement; can be disabled if needed.
+    return os.getenv("ENABLE_TRANSLATION", "1") == "1"
+
+
+def detect_language(text: str) -> str:
+    """
+    Lightweight language detection.
+    Uses `langdetect` when available; otherwise falls back to 'auto'.
+    """
+    if not text or not text.strip():
+        return "en"
+
+    try:
+        from langdetect import detect  # type: ignore
+
+        lang = detect(text)
+        return _norm_lang(lang)
+    except Exception:
+        return "auto"
+
+
+@lru_cache(maxsize=2048)
+def _translate_cached(text: str, source: str, target: str) -> str:
+    translator = GoogleTranslator(source=source, target=target)
+    return translator.translate(text)
+
+
+def translate(text: str, source: str, target: str) -> str:
+    """
+    Translate text using GoogleTranslator with caching and safe fallbacks.
+    Returns original text on failure.
+    """
+    if not _translation_enabled():
+        return text
+
+    source = _norm_lang(source)
+    target = _norm_lang(target)
+
+    if not text or not text.strip():
+        return text
+    if target == "auto":
+        return text
+    if source != "auto" and source == target:
+        return text
+
+    try:
+        return _translate_cached(text, source, target)
+    except Exception as e:
+        logger.warning(f"Translation failed ({source}->{target}); returning original text: {e}")
+        return text
+
+
+def to_english(user_text: str, user_lang_hint: str = "auto") -> Tuple[str, str]:
+    """
+    Returns (english_text, detected_user_lang).
+    If language is English (detected or hinted), returns original.
+    """
+    if not _translation_enabled():
+        return user_text, _norm_lang(user_lang_hint) if user_lang_hint else "en"
+
+    hint = _norm_lang(user_lang_hint)
+    detected = detect_language(user_text) if hint in {"auto", "en"} else hint
+    detected = detected if detected != "auto" else "auto"
+
+    if detected == "en":
+        return user_text, "en"
+
+    english = translate(user_text, source=detected, target="en")
+    # If translation returned unchanged and we don't know language, keep hint
+    return english, (detected if detected != "auto" else hint)
+
+
+def from_english(english_text: str, target_lang: str) -> str:
+    """
+    Translate bot output back to the user's language (if not English).
+    """
+    target = _norm_lang(target_lang)
+    if not _translation_enabled() or target in {"en", "auto"}:
+        return english_text
+    return translate(english_text, source="en", target=target)
+
+
+
+

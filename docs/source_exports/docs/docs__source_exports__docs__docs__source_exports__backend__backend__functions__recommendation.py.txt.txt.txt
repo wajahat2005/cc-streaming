@@ -1,0 +1,80 @@
+FILE: docs\source_exports\docs\docs__source_exports__backend__backend__functions__recommendation.py.txt.txt
+COMPONENT: docs
+================================================================================
+FILE: docs\source_exports\backend\backend__functions__recommendation.py.txt
+COMPONENT: docs
+================================================================================
+FILE: backend\functions\recommendation.py
+COMPONENT: backend
+================================================================================
+import random
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Fake product database for the demo
+PRODUCTS = {
+    "laptop": [
+        {"name": "ThinkPad X1 Carbon Gen 10", "price": "$1200", "type": "productivity"},
+        {"name": "MacBook Pro M2 14-inch", "price": "$1999", "type": "creative"},
+        {"name": "Alienware m15 R7", "price": "$1800", "type": "gaming"}
+    ],
+    "phone": [
+        {"name": "iPhone 14 Pro", "price": "$999"},
+        {"name": "Samsung Galaxy S23 Ultra", "price": "$1199"},
+        {"name": "Google Pixel 7 Pro", "price": "$899"}
+    ]
+}
+
+def lambda_handler(event, context=None):
+    """
+    Simulates an AWS Lambda / Cloud Function.
+    This is stateless, spin-up-on-demand logic.
+    
+    event mapping:
+    {
+        "entities": ["laptop", "gaming"], # Extracted from NLP
+        "user_id": "user_123"
+    }
+    """
+    try:
+        entities = event.get("entities", [])
+        
+        # Determine the target category based on entities (if any)
+        # Using a simple heuristic for demonstration
+        target = "phone" # default fallback
+        
+        text_lower = " ".join(entities).lower()
+        if "laptop" in text_lower or "computer" in text_lower or "mac" in text_lower:
+            target = "laptop"
+
+        recommendations = PRODUCTS.get(target, PRODUCTS["phone"])
+        
+        # Pick a random recommendation for variety
+        rec = random.choice(recommendations)
+        
+        # Formulate Upsell/Recommendation text
+        response_text = f"Based on your query, a great {target} option is the {rec['name']} at {rec['price']}. It's a fantastic value. Would you like me to add it to your cart?"
+        
+        return {
+            "statusCode": 200,
+            "body": {
+                "recommendation": rec,
+                "message": response_text
+            }
+        }
+    except Exception as e:
+        logger.error(f"Lambda Error: {e}")
+        return {
+            "statusCode": 500,
+            "body": {
+                "message": "I experienced an error fetching recommendations right now."
+            }
+        }
+
+# For local testing if executed directly
+if __name__ == "__main__":
+    print(lambda_handler({"entities": ["laptop"]}))
+
+
+

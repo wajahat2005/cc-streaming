@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s       # How often Prometheus scrapes each target
+  evaluation_interval: 15s   # How often rules are evaluated
+
+scrape_configs:
+  # ── FastAPI Backend ──────────────────────────────────────────────
+  - job_name: "chatbot-backend"
+    static_configs:
+      - targets: ["backend:8000"]
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+
+  # ── Prometheus self-monitoring ───────────────────────────────────
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

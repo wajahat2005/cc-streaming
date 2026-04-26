@@ -1,0 +1,98 @@
+FILE: docs\source_exports\docs\docs__source_exports__backend__backend__test_qa.py.txt.txt
+COMPONENT: docs
+================================================================================
+FILE: docs\source_exports\backend\backend__test_qa.py.txt
+COMPONENT: docs
+================================================================================
+FILE: backend\test_qa.py
+COMPONENT: backend
+================================================================================
+import pytest
+from fastapi.testclient import TestClient
+from unittest.mock import patch, MagicMock
+import sys
+
+# 💉 Mocking external dependencies before importing main app
+sys.modules['kafka'] = MagicMock()
+sys.modules['kafka_producer'] = MagicMock()
+sys.modules['deep_translator'] = MagicMock()
+sys.modules['textblob'] = MagicMock()
+sys.modules['redis'] = MagicMock()
+sys.modules['backoff'] = MagicMock()
+
+from main import app
+
+client = TestClient(app)
+
+class TestChatbotQA:
+    
+    @patch("main.translate_to_en")
+    @patch("main.HybridNLPEngine.process_query")
+    def test_greeting(self, mock_nlp, mock_translate):
+        mock_translate.return_value = ("hello", "en")
+        mock_nlp.return_value = {
+            "intent": "greeting",
+            "entities": {"order_ids": [], "locations": [], "names": [], "skus": [], "products": [], "emails": []},
+            "hits": [],
+            "confidence": 0.99
+        }
+        
+        response = client.post("/chat", json={"message": "hello", "user_id": "test_user"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["intent"] == "greeting"
+        assert data["confidence"] == 0.99
+
+    @patch("main.translate_to_en")
+    @patch("main.HybridNLPEngine.process_query")
+    def test_order_tracking_with_id(self, mock_nlp, mock_translate):
+        mock_translate.return_value = ("where is my order ORD-12345", "en")
+        mock_nlp.return_value = {
+            "intent": "order_tracking",
+            "entities": {"order_ids": ["ORD-12345"], "locations": [], "names": [], "skus": [], "products": [], "emails": []},
+            "hits": [],
+            "confidence": 0.95
+        }
+        
+        response = client.post("/chat", json={"message": "where is my order ORD-12345", "user_id": "test_user"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["intent"] == "order_tracking"
+        assert "ORD-12345" in data["response"]
+
+    @patch("main.translate_to_en")
+    @patch("main.HybridNLPEngine.process_query")
+    def test_discovery_fallback(self, mock_nlp, mock_translate):
+        mock_translate.return_value = ("unknown question", "en")
+        mock_nlp.return_value = {
+            "intent": "unknown",
+            "entities": {"order_ids": [], "locations": [], "names": [], "skus": [], "products": [], "emails": []},
+            "hits": [],
+            "confidence": 0.1
+        }
+        
+        with patch("main.automated_discovery") as mock_disc:
+            mock_disc.return_value = {"answer": "Discovered answer"}
+            response = client.post("/chat", json={"message": "how to hack?", "user_id": "test_user"})
+            data = response.json()
+            assert "discovered" in data["response"].lower()
+            assert data["is_discovery"] == True
+
+    def test_invalid_input_missing_user_id(self):
+        response = client.post("/chat", json={"message": "hello"})
+        assert response.status_code == 422 
+
+    @patch("main.translate_to_en")
+    @patch("main.TextBlob")
+    def test_extremely_negative_sentiment_escalation(self, mock_textblob, mock_translate):
+        mock_translate.return_value = ("I hate this", "en")
+        mock_textblob.return_value.sentiment.polarity = -0.9
+        
+        response = client.post("/chat", json={"message": "I hate this", "user_id": "test_user"})
+        data = response.json()
+        assert data["intent"] == "escalation"
+        assert "specialist" in data["response"]
+
+
+
+

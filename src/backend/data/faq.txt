@@ -1,0 +1,3 @@
+How to reset password? | Click on forgot password | kb_faq
+How to track order? | Use tracking ID | order_tracking
+Refund policy? | Refund takes 5-7 days | refund_requests

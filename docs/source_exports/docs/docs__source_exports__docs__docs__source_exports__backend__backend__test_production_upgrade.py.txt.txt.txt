@@ -1,0 +1,93 @@
+FILE: docs\source_exports\docs\docs__source_exports__backend__backend__test_production_upgrade.py.txt.txt
+COMPONENT: docs
+================================================================================
+FILE: docs\source_exports\backend\backend__test_production_upgrade.py.txt
+COMPONENT: docs
+================================================================================
+FILE: backend\test_production_upgrade.py
+COMPONENT: backend
+================================================================================
+import pytest
+from fastapi.testclient import TestClient
+from unittest.mock import patch, MagicMock
+import os
+import sys
+
+# Mocking external dependencies
+sys.modules['kafka'] = MagicMock()
+sys.modules['kafka_producer'] = MagicMock()
+sys.modules['deep_translator'] = MagicMock()
+sys.modules['textblob'] = MagicMock()
+sys.modules['redis'] = MagicMock()
+sys.modules['backoff'] = MagicMock()
+
+# Now import the app
+from main import app
+from core.session import session_manager
+from models.session import ChatState
+
+client = TestClient(app)
+
+class TestProductionUpgrade:
+    
+    @patch("main.translate_to_en")
+    @patch("core.nlp.requests.post")
+    def test_hybrid_nlp_orchestration(self, mock_post, mock_translate):
+        # Mock Lucene response
+        mock_post.return_value.json.return_value = {
+            "intent": "greeting",
+            "hits": [],
+            "nlp_metadata": {"entities": {"names": ["Wajahat"]}}
+        }
+        
+        # Mock translation to return the string as-is
+        mock_translate.return_value = ("Hi, I'm Wajahat and I want to track ORD-12345", "en")
+        
+        # Test query that has both Rigid (Order ID) and Probabilistic (Name) entities
+        response = client.post("/chat", json={
+            "message": "Hi, I'm Wajahat and I want to track ORD-12345", 
+            "user_id": "user_pro"
+        })
+        
+        data = response.json()
+        # Intent should be boosted to order_tracking due to ORD-12345
+        assert data["intent"] == "order_tracking"
+        assert "ORD-12345" in data["entities"]["order_ids"]
+        assert "Wajahat" in data["entities"]["names"]
+
+    def test_redis_fallback_transparency(self):
+        # Verify that session manager works even if Redis is "down" (mocked as down by default in this test setup)
+        session = session_manager.get_session("fallback_user")
+        session.user_name = "Fallback User"
+        session_manager.save_session(session)
+        
+        # Retrieve again
+        retrieved = session_manager.get_session("fallback_user")
+        assert retrieved.user_name == "Fallback User"
+        assert retrieved.user_id == "fallback_user"
+
+    @patch("main.translate_to_en")
+    @patch("core.nlp.requests.post")
+    def test_sku_extraction(self, mock_post, mock_translate):
+        mock_post.return_value.json.return_value = {"intent": "unknown", "hits": []}
+        
+        # Mock translation to return the string as-is
+        mock_translate.return_value = ("I need help with SKU-123456", "en")
+        
+        response = client.post("/chat", json={
+            "message": "I need help with SKU-123456", 
+            "user_id": "user_pro"
+        })
+        data = response.json()
+        assert "SKU-123456" in data["entities"]["skus"]
+
+    def test_health_endpoint(self):
+        response = client.get("/health")
+        assert response.status_code == 200
+        assert "session_storage" in response.json()
+
+if __name__ == "__main__":
+    pytest.main([__file__])
+
+
+

@@ -1,0 +1,33 @@
+[
+  {
+    "session_id": "session_001",
+    "user_id": "user_123",
+    "messages": [
+      {"role": "user", "text": "Hello", "timestamp": "2026-04-26T10:00:00Z"},
+      {"role": "bot", "text": "Hello! How can I help you today?", "timestamp": "2026-04-26T10:00:01Z"}
+    ],
+    "intent": "greeting",
+    "sentiment": 0.5
+  },
+  {
+    "session_id": "session_002",
+    "user_id": "user_456",
+    "messages": [
+      {"role": "user", "text": "Where is my order ORD-12345?", "timestamp": "2026-04-26T10:05:00Z"},
+      {"role": "bot", "text": "Your order ORD-12345 is currently in transit and expected to arrive tomorrow.", "timestamp": "2026-04-26T10:05:02Z"}
+    ],
+    "intent": "order_tracking",
+    "sentiment": 0.0
+  },
+  {
+    "session_id": "session_003",
+    "user_id": "user_789",
+    "messages": [
+      {"role": "user", "text": "I'm very unhappy with the service!", "timestamp": "2026-04-26T10:10:00Z"},
+      {"role": "bot", "text": "I'm sorry to hear that. Let me connect you with a human agent who can better assist you.", "timestamp": "2026-04-26T10:10:01Z"}
+    ],
+    "intent": "sentiment",
+    "sentiment": -0.8,
+    "escalated": true
+  }
+]

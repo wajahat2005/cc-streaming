@@ -1,0 +1,124 @@
+FILE: docs\source_exports\docs\docs__REPORT.md.txt
+COMPONENT: docs
+================================================================================
+FILE: docs\REPORT.md
+COMPONENT: docs
+================================================================================
+# Project Report — AI-Powered Customer Support Chatbot (OpenNLP + Lucene)
+
+## 1) Abstract
+- Problem statement:
+- Proposed solution:
+- Key technologies:
+- Outcomes (metrics):
+
+## 2) System Overview
+### 2.1 Components
+- React UI (`chat-ui`)
+- FastAPI gateway (`backend`)
+- Java NLP/Search microservice (`backend/ai-chatbot`) using OpenNLP + Lucene
+- Kafka audit logging (`kafka`, topic `chat_logs`)
+- Consumer worker (writes `chat_logs.jsonl`)
+- Redis session store
+
+### 2.2 Data Flow
+1. User message → `POST /chat`
+2. FastAPI session load + context handling
+3. FastAPI → Java service `POST /search` (intent + entities + Lucene hits)
+4. Response generation + sentiment scoring
+5. Audit event published to Kafka
+6. Consumer persists to `chat_logs.jsonl`
+7. Dashboard reads `/analytics`
+
+## 3) NLP Design
+### 3.1 Intent Recognition (OpenNLP)
+- Model: `DocumentCategorizerME` (`en-intent.bin`)
+- Training data: `backend/data/intents.json`
+- Training parameters: iterations, cutoff
+- Output: `(intent, confidence)`
+
+### 3.2 Entity Extraction
+- OpenNLP:
+  - Tokenizer (`en-token.bin`)
+  - Person NER (`en-ner-person.bin`) for names (optional)
+- Regex (FastAPI + Java):
+  - Order IDs (`ORD-12345`, `#12345`, `12345`)
+  - SKU (`SKU-123456`)
+  - Locations (demo set: Islamabad/Lahore/Attock/Quetta)
+  - Emails
+- Entity resolution:
+  - merge + deduplicate
+  - context-aware cleanup (e.g., remove numeric substring duplicates)
+
+### 3.3 Sentiment Analysis
+- Method used:
+- Thresholds:
+  - escalation trigger:
+
+### 3.4 Context / State Management
+- Store: Redis (TTL-based) with in-memory fallback
+- States (example):
+  - awaiting order ID
+  - escalated
+- Context variables:
+  - last known location
+  - user name
+
+## 4) Knowledge Management (Lucene)
+### 4.1 Indexing
+- Fields:
+  - `question` (TextField)
+  - `answer` (TextField)
+  - `intent` (StringField)
+- Source:
+  - Built-in dataset + `backend/data/faq.txt`
+
+### 4.2 Retrieval Strategy
+- Fuzzy match for typo tolerance
+- Boosting:
+  - entity terms (medium boost)
+  - predicted intent match (high boost)
+
+## 5) Real-Time Cloud Concepts
+### 5.1 Serverless-style functions
+- Example: product recommendation handler
+
+### 5.2 Message queue (Kafka)
+- Topic: `chat_logs`
+- Consumer persistence format: JSONL
+
+### 5.3 Real-time inference
+- Java microservice called per request (`/search`)
+
+## 6) Evaluation
+### 6.1 Metrics (required)
+- Intent recognition accuracy
+- Response relevance score
+- Average conversation length
+- Knowledge base coverage
+- User satisfaction rating
+
+### 6.2 How metrics are computed in this demo
+- Intent accuracy proxy:
+- Relevance proxy:
+- Conversation length:
+- Coverage:
+- Satisfaction proxy (sentiment + escalations):
+
+### 6.3 Results
+Include tables/plots and discussion.
+
+## 7) Limitations & Future Work
+- Add multilingual models / local translation
+- Add voice input (STT)
+- Improve sentiment with a trained classifier
+- Expand KB + feedback loop for relevance/accuracy labels
+- Better entity models (custom NER)
+
+## 8) How to Run
+- `docker compose up --build`
+- UI: `http://localhost:3000`
+- API docs: `http://localhost:8000/docs`
+
+
+

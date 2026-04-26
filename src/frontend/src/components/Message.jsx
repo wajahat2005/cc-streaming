@@ -1,0 +1,17 @@
+// src/components/Message.jsx
+import React from 'react';
+
+const Message = ({ isBot, text, timestamp }) => {
+  return (
+    <div className={`message-wrapper ${isBot ? 'bot' : 'user'}`}>
+      <div className="message-bubble">
+        {text}
+      </div>
+      <div className="message-time">
+        {timestamp}
+      </div>
+    </div>
+  );
+};
+
+export default Message;

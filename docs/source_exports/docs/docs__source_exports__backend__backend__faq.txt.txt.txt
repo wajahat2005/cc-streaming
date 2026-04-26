@@ -1,0 +1,10 @@
+FILE: docs\source_exports\backend\backend__faq.txt.txt
+COMPONENT: docs
+================================================================================
+FILE: backend\faq.txt
+COMPONENT: backend
+================================================================================
+ How to reset password? | Click on forgot password
+How to track order? | Use tracking ID
+Refund policy? | Refund takes 5-7 days
+

@@ -1,0 +1,31 @@
+FILE: chat-ui\nginx.conf
+COMPONENT: chat-ui
+================================================================================
+server {
+    listen 3000;
+
+    location / {
+        root /usr/share/nginx/html;
+        index index.html index.htm;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy API requests to the backend
+    location /chat {
+        proxy_pass http://backend:8000/chat;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /health {
+        proxy_pass http://backend:8000/health;
+        proxy_set_header Host $host;
+    }
+
+    location /analytics {
+        proxy_pass http://backend:8000/analytics;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+

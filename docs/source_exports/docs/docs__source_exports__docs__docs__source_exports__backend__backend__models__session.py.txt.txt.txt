@@ -1,0 +1,44 @@
+FILE: docs\source_exports\docs\docs__source_exports__backend__backend__models__session.py.txt.txt
+COMPONENT: docs
+================================================================================
+FILE: docs\source_exports\backend\backend__models__session.py.txt
+COMPONENT: docs
+================================================================================
+FILE: backend\models\session.py
+COMPONENT: backend
+================================================================================
+from pydantic import BaseModel, Field
+from typing import List, Dict, Optional, Any
+from enum import Enum
+
+class ChatState(str, Enum):
+    IDLE = "idle"
+    AWAITING_ORDER_ID = "awaiting_order_id"
+    AWAITING_FEEDBACK = "awaiting_feedback"
+    ESCALATED = "escalated"
+
+class Message(BaseModel):
+    role: str
+    msg: str
+
+class SessionData(BaseModel):
+    user_id: str
+    user_name: Optional[str] = None
+    history: List[Message] = Field(default_factory=list)
+    last_intent: Optional[str] = None
+    state: ChatState = ChatState.IDLE
+    context: Dict[str, Any] = Field(default_factory=dict)
+    escalated: bool = False
+    lang: str = "en"
+
+    def add_message(self, role: str, msg: str):
+        self.history.append(Message(role=role, msg=msg))
+        if len(self.history) > 10:
+            self.history = self.history[-10:]
+
+    def clear_state(self):
+        self.state = ChatState.IDLE
+        self.context = {}
+
+
+

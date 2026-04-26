@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chatbot-backend
+  labels:
+    app: chatbot
+    component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: chatbot
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: chatbot
+        component: backend
+    spec:
+      containers:
+      - name: backend
+        image: chatbot-backend:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: LUCENE_URL
+          value: "http://chatbot-lucene:4567"
+        - name: KAFKA_BROKER
+          value: "kafka:9092"
+        - name: REDIS_HOST
+          value: "redis"
+        - name: ENABLE_TRANSLATION
+          value: "1"
+        - name: INTENT_MIN_CONFIDENCE
+          value: "0.35"
+        - name: LUCENE_MIN_SCORE
+          value: "2.0"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chatbot-lucene
+  labels:
+    app: chatbot
+    component: lucene
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chatbot
+      component: lucene
+  template:
+    metadata:
+      labels:
+        app: chatbot
+        component: lucene
+    spec:
+      containers:
+      - name: lucene
+        image: chatbot-lucene:latest
+        ports:
+        - containerPort: 4567
+        env:
+        - name: PORT
+          value: "4567"
+        - name: MODELS_DIR
+          value: "/app/data/models"
+        - name: KB_FILE
+          value: "/app/data/faq.txt"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 4567
+          initialDelaySeconds: 60
+          periodSeconds: 15
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chatbot-frontend
+  labels:
+    app: chatbot
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: chatbot
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: chatbot
+        component: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: chatbot-frontend:latest
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"

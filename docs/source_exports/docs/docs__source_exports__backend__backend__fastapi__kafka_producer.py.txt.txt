@@ -1,0 +1,24 @@
+FILE: docs\source_exports\backend\backend__fastapi__kafka_producer.py.txt
+COMPONENT: docs
+================================================================================
+FILE: backend\fastapi\kafka_producer.py
+COMPONENT: backend
+================================================================================
+from kafka import KafkaProducer
+import json
+
+producer = KafkaProducer(
+    bootstrap_servers='localhost:9092',
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+)
+from kafka import KafkaProducer
+import json
+
+producer = KafkaProducer(
+    bootstrap_servers='kafka:9092',
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+)
+
+def send_log(data):
+    producer.send('chat_logs', data)
+

@@ -1,0 +1,22 @@
+FILE: docs\source_exports\chat-ui\chat-ui__src__components__MessageItem.jsx.txt
+COMPONENT: docs
+================================================================================
+FILE: chat-ui\src\components\MessageItem.jsx
+COMPONENT: chat-ui
+================================================================================
+import React from 'react';
+
+const MessageItem = ({ text, isBot, timestamp }) => {
+  return (
+    <div className={`message-wrapper ${isBot ? 'bot' : 'user'}`}>
+      <div className={`message ${isBot ? 'bot' : 'user'}`}>
+        <p className="message-text">{text}</p>
+        <span className="message-time">{timestamp}</span>
+      </div>
+    </div>
+  );
+};
+
+export default MessageItem;
+
+

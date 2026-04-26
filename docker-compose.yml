@@ -1,0 +1,218 @@
+services:
+  # ---------------- ZOOKEEPER ----------------
+  # Role: Coordinates the Kafka brokers and manages cluster state.
+  zookeeper:
+    image: wurstmeister/zookeeper
+    platform: linux/amd64
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD", "sh", "-lc", "/opt/zookeeper-3.4.13/bin/zkServer.sh status | grep -q Mode"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - chatbot-net
+
+  # ---------------- KAFKA ----------------
+  # Role: Distributed message broker for real-time chat auditing and logging.
+  kafka:
+    image: wurstmeister/kafka
+    platform: linux/amd64
+    ports:
+      - "9092:9092"
+    environment:
+      # Advertised listeners tell Kafka clients where to find the broker
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Automatically create the required topic for auditing
+      KAFKA_CREATE_TOPICS: "chat_logs:1:1"
+      KAFKA_ZOOKEEPER_SESSION_TIMEOUT_MS: 30000
+    restart: always
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "sh", "-lc", "nc -z 127.0.0.1 9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - chatbot-net
+
+  # ---------------- LUCENE (AI Engine) ----------------
+  # Role: Java microservice handling OpenNLP logic and Lucene Fuzzy Search.
+  lucene:
+    build:
+      context: "./src/ai-chatbot" # Builds from the Java project folder
+    platform: linux/amd64
+    ports:
+      - "4567:4567"
+    environment:
+      - PORT=4567
+      - MODELS_DIR=/app/data/models # Internal path for OpenNLP .bin files
+      - KB_FILE=/app/data/faq.txt
+    volumes:
+      # Persists models and training data across container restarts
+      - "./src/backend/data:/app/data"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4567/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+    restart: unless-stopped
+    networks:
+      - chatbot-net
+
+  # ---------------- BACKEND (Python/FastAPI) ----------------
+  # Role: The API gateway and business logic orchestrator.
+  backend:
+    build:
+      context: "./src/backend"
+    platform: linux/amd64
+    ports:
+      - "8000:8000"
+    volumes:
+      # Shared volume for auditing logs (shared with the Consumer)
+      - "chat-logs:/app/logs"
+    environment:
+      # Cloud service addresses for internal container communication
+      - LUCENE_URL=http://lucene:4567
+      - KAFKA_BROKER=kafka:9092
+      - REDIS_HOST=redis
+      - ENABLE_TRANSLATION=1
+      - INTENT_MIN_CONFIDENCE=0.35
+      - INTENT_LOW_CONFIDENCE=0.25
+      - LUCENE_MIN_SCORE=2.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+      lucene:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+    restart: unless-stopped
+    networks:
+      - chatbot-net
+
+  # ---------------- REDIS (Session Store) ----------------
+  # Role: High-speed in-memory database for managing user sessions and states.
+  redis:
+    image: redis:alpine
+    platform: linux/amd64
+    ports:
+      - "6379:6379"
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - chatbot-net
+
+  # ---------------- FRONTEND (React) ----------------
+  # Role: The User Interface layer.
+  frontend:
+    build:
+      context: "./src/frontend"
+    platform: linux/amd64
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+    restart: unless-stopped
+    networks:
+      - chatbot-net
+
+  # ---------------- CONSUMER (Audit Worker) ----------------
+  # Role: Background worker that listens to Kafka and persists logs to disk.
+  consumer:
+    build:
+      context: "./src/backend"
+    platform: linux/amd64
+    command: ["python", "kafka_consumer.py"]
+    environment:
+      - KAFKA_BROKER=kafka:9092
+    volumes:
+      - "chat-logs:/app/logs"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: on-failure:5
+    networks:
+      - chatbot-net
+
+  # ---------------- PROMETHEUS (Metrics Collector) ----------------
+  # Role: Scrapes /metrics from the FastAPI backend for time-series storage.
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    platform: linux/amd64
+    ports:
+      - "9090:9090"
+    volumes:
+      - "./config/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - chatbot-net
+
+  # ---------------- GRAFANA (Metrics Dashboard) ----------------
+  # Role: Visualises Prometheus metrics with pre-loaded dashboards.
+  grafana:
+    image: grafana/grafana:10.4.0
+    platform: linux/amd64
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=chatbot123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/grafana_dashboard.json
+    volumes:
+      # Datasource provisioning (auto-creates Prometheus datasource)
+      - "./config/monitoring/grafana_datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro"
+      # Dashboard provider config
+      - "./config/monitoring/grafana_dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro"
+      # Dashboard JSON file
+      - "./config/monitoring/grafana_dashboard.json:/etc/grafana/provisioning/dashboards/grafana_dashboard.json:ro"
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - chatbot-net
+
+# ---------------- NETWORKS ----------------
+# Creates a virtual private network for isolated container communication.
+networks:
+  chatbot-net:
+    driver: bridge
+
+# ---------------- VOLUMES ----------------
+# Named volume for persistent application data (Logs).
+volumes:
+  chat-logs:
+  prometheus-data:
+  grafana-data:

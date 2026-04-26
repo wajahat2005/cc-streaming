@@ -1,0 +1,22 @@
+FILE: docs\source_exports\docs\docs__source_exports__chat-ui__chat-ui__src__main.jsx.txt.txt
+COMPONENT: docs
+================================================================================
+FILE: docs\source_exports\chat-ui\chat-ui__src__main.jsx.txt
+COMPONENT: docs
+================================================================================
+FILE: chat-ui\src\main.jsx
+COMPONENT: chat-ui
+================================================================================
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.jsx'
+import './index.css'
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)
+
+
+

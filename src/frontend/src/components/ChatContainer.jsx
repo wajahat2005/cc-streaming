@@ -1,0 +1,242 @@
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { sendMessageToBot, fetchHealth } from '../services/api';
+
+/**
+ * 💬 ChatContainer: Premium Interaction Hub.
+ */
+const ChatContainer = () => {
+  const createUserId = () => {
+    if (window.crypto?.randomUUID) {
+      return `user_${window.crypto.randomUUID()}`;
+    }
+    return `user_${Date.now()}`;
+  };
+
+  const [messages, setMessages] = useState([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [error, setError] = useState(null);
+  const [language, setLanguage] = useState('en');
+  const [systemStatus, setSystemStatus] = useState('checking');
+
+  const messagesEndRef = useRef(null);
+  const userIdRef = useRef(localStorage.getItem('chatbot_user_id') || createUserId());
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
+
+  useEffect(() => {
+    localStorage.setItem('chatbot_user_id', userIdRef.current);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadHealth = async () => {
+      try {
+        const health = await fetchHealth();
+        if (mounted) {
+          setSystemStatus(health.status === 'online' ? 'online' : 'degraded');
+        }
+      } catch {
+        if (mounted) {
+          setSystemStatus('offline');
+        }
+      }
+    };
+
+    loadHealth();
+    const timer = setInterval(loadHealth, 15000);
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  /**
+   * handleSend: Dispatches messages and handles the learning/discovery state.
+   */
+  const handleSend = useCallback(async (forcedMessage = null) => {
+    const textToSend = forcedMessage || inputValue.trim();
+    if (!textToSend || isLoading) return;
+
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    setMessages(prev => [...prev, { text: textToSend, isBot: false, timestamp }]);
+    setInputValue('');
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const data = await sendMessageToBot(textToSend, userIdRef.current, language);
+      const botTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      
+      setMessages(prev => [...prev, { 
+        text: data.response, 
+        isBot: true, 
+        timestamp: botTimestamp,
+        escalated: data.escalated || data.intent === 'escalation',
+        is_discovery: data.is_discovery,
+        metadata: {
+          intent: data.intent,
+          confidence: data.confidence,
+          debug: data.debug
+        }
+      }]);
+    } catch (err) {
+      const botTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setMessages(prev => [...prev, {
+        text: err.message || "System Offline. I'm currently unable to process queries. Please try again shortly.",
+        isBot: true,
+        timestamp: botTimestamp,
+        metadata: { intent: "system_error" }
+      }]);
+      setSystemStatus('offline');
+      setError("Connectivity issue. Ensure backend services are active.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [inputValue, isLoading, language]);
+
+  const toggleListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Browser doesn't support Web Speech API.");
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = language === 'en' ? 'en-US' : (language === 'ur' ? 'ur-PK' : 'es-ES');
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+    
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      if (transcript) handleSend(transcript);
+    };
+
+    recognition.start();
+  };
+
+  return (
+    <div className="chat-window">
+      <div className="chat-messages">
+        {messages.length === 0 && (
+          <div className="empty-state" style={{ textAlign: 'center', marginTop: '100px', opacity: 0.3 }}>
+             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ marginBottom: '16px' }}>
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+             </svg>
+             <p style={{ fontSize: '0.8rem', fontWeight: '500', letterSpacing: '0.05em' }}>INTELLIGENCE INITIALIZED</p>
+          </div>
+        )}
+        
+        {messages.map((msg, index) => (
+          <div key={index} className={`message-row ${msg.isBot ? 'bot' : 'user'}`}>
+            <div className="bubble">
+              {msg.is_discovery && (
+                <div className="discovery-badge">
+                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                   </svg>
+                   Discovery
+                </div>
+              )}
+              {msg.text}
+              {msg.isBot && msg.metadata && (
+                <div className="message-meta-info" title={`Score: ${msg.metadata.debug?.top_score || 0} | Conf: ${msg.metadata.confidence}`}>
+                   <span className="meta-intent">{msg.metadata.intent}</span>
+                   <span className="meta-conf">{Math.round(msg.metadata.confidence)}%</span>
+                </div>
+              )}
+              {msg.isBot && msg.escalated && (
+                <div className="escalated-tag">Escalated to Agent</div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {isLoading && (
+          <div className="message-row bot">
+            <div className="bubble typing">Analyzing sequence...</div>
+          </div>
+        )}
+        
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div className="interaction-bar">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <select 
+            className="lang-select" 
+            value={language} 
+            onChange={(e) => setLanguage(e.target.value)}
+            style={{ 
+               background: 'rgba(255,255,255,0.05)', 
+               border: '1px solid rgba(255,255,255,0.1)', 
+               borderRadius: '8px', 
+               color: '#94a3b8',
+               padding: '4px 8px',
+               fontSize: '0.7rem' 
+            }}
+          >
+            <option value="en">English 🇺🇸</option>
+            <option value="ur">Urdu 🇵🇰</option>
+            <option value="es">Spanish 🇪🇸</option>
+          </select>
+          <div className="status-indicator">
+            <div className={`dot ${systemStatus === 'online' ? 'online' : systemStatus === 'degraded' ? 'degraded' : ''}`}></div>
+            <span style={{ fontSize: '0.6rem', fontWeight: '600', textTransform: 'uppercase' }}>
+              {systemStatus === 'online' ? 'System Online' : systemStatus === 'degraded' ? 'System Degraded' : 'System Offline'}
+            </span>
+          </div>
+        </div>
+
+        {error && <div className="error-banner">{error}</div>}
+
+        <form className="input-group" onSubmit={(e) => { e.preventDefault(); handleSend(); }}>
+          <button 
+            type="button" 
+            className={`action-btn btn-mic ${isListening ? 'listening' : ''}`} 
+            onClick={toggleListening}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+            </svg>
+          </button>
+          
+          <input
+            type="text"
+            placeholder={isListening ? "Listening..." : "Query system..."}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            disabled={isLoading}
+          />
+
+          <button type="submit" className="action-btn btn-send" disabled={!inputValue.trim() || isLoading}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default ChatContainer;

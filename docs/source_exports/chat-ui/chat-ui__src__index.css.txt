@@ -1,0 +1,256 @@
+FILE: chat-ui\src\index.css
+COMPONENT: chat-ui
+================================================================================
+:root {
+  /* --- Brand Colors --- */
+  --primary: 217 91% 60%;          /* Solid Professional Blue */
+  --primary-foreground: 210 40% 98%;
+  --secondary: 222 47% 11%;
+  --secondary-foreground: 210 40% 98%;
+  --accent: 217 91% 65%;
+  
+  /* --- Layout Colors --- */
+  --background: 222 47% 4%;        /* Standard Dark */
+  --card: 217 32% 10%;
+  --card-foreground: 210 40% 98%;
+  --border: 217 32% 17%;
+  --input: 217 32% 17%;
+  --ring: 221 83% 53%;
+  
+  /* --- Simplified Glass Tokens --- */
+  --glass: rgba(15, 23, 42, 0.9);  /* More opaque, less distracting */
+  --glass-border: rgba(255, 255, 255, 0.08);
+  
+  /* --- Simple Shadows --- */
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  
+  /* --- Shapes --- */
+  --radius-lg: 16px;               /* Standard Radius */
+  --radius-md: 12px;
+  --radius-sm: 8px;
+}
+
+/* --- Clean Professional Background --- */
+body {
+  background: #020617;             /* Simple Solid Dark */
+  color: hsl(var(--card-foreground));
+  height: 100vh;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* --- Simple App Shell --- */
+.app-container {
+  width: min(92vw, 440px);
+  height: min(90vh, 800px);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  animation: fadeIn 0.4s ease-out; /* Simpler Animation */
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* --- Standard Scrollbar --- */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+
+.app-header {
+  padding: 20px 24px;
+  background: rgba(15, 23, 42, 1);
+  border-bottom: 1px solid var(--glass-border);
+  text-align: center;
+}
+
+.brand h1 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 2px;
+}
+
+.brand-desc {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* --- Chat Window --- */
+.chat-window {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message-row {
+  display: flex;
+  width: 100%;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.message-row.user { justify-content: flex-end; }
+
+.bubble {
+  max-width: 85%;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.user .bubble {
+  background: #2563eb; /* Solid Blue */
+  color: white;
+}
+
+.bot .bubble {
+  background: #1e293b; /* Slate Grey */
+  border: 1px solid var(--glass-border);
+  color: #f1f5f9;
+}
+
+/* Discovery Indicator */
+.discovery-badge {
+  background: #d97706; /* Solid Amber */
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  display: inline-block;
+}
+
+/* --- Interaction Bar --- */
+.interaction-bar {
+  padding: 20px;
+  background: #0f172a;
+  border-top: 1px solid var(--glass-border);
+}
+
+.input-group {
+  background: #1e293b;
+  border: 1px solid var(--glass-border);
+  padding: 4px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.input-group input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 10px 14px;
+  color: white;
+  outline: none;
+  font-size: 0.9rem;
+}
+
+.action-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.1s;
+}
+
+.btn-send { background: #2563eb; color: white; }
+.btn-send:hover { background: #1d4ed8; }
+
+.btn-mic { background: transparent; color: #64748b; }
+.btn-mic:hover { color: white; }
+
+/* --- Dashboard --- */
+.stat-card {
+  background: #1e293b;
+  padding: 20px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+}
+
+.stat-val { font-size: 1.5rem; font-weight: 600; color: white; }
+.stat-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; margin-top: 4px; }
+
+.discovery-stat { border-left: 4px solid #d97706; }
+ 
+ /* --- Metadata & Tooltips --- */
+ .message-meta-info {
+   display: flex;
+   align-items: center;
+   gap: 6px;
+   margin-top: 8px;
+   padding-top: 6px;
+   border-top: 1px solid rgba(255, 255, 255, 0.05);
+   cursor: help;
+ }
+ 
+ .meta-intent {
+   font-size: 0.6rem;
+   font-weight: 700;
+   text-transform: uppercase;
+   letter-spacing: 0.05em;
+   color: #3b82f6;
+ }
+ 
+ .meta-conf {
+   font-size: 0.6rem;
+   color: #64748b;
+   background: rgba(255, 255, 255, 0.05);
+   padding: 1px 4px;
+   border-radius: 3px;
+ }
+ 
+ .escalated-tag {
+   margin-top: 8px;
+   font-size: 0.65rem;
+   font-weight: 600;
+   color: #f43f5e;
+   display: flex;
+   align-items: center;
+   gap: 4px;
+ }
+ 
+ .escalated-tag::before {
+   content: '●';
+   animation: pulse 1s infinite;
+ }
+ 
+ @keyframes pulse {
+   0% { opacity: 1; }
+   50% { opacity: 0.3; }
+   100% { opacity: 1; }
+ }
+

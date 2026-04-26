@@ -1,0 +1,81 @@
+FILE: docs\source_exports\java-ai-chatbot\backend__ai-chatbot__src__main__java__com__wajahat__chatbot__lucene__DataStore.java.txt
+COMPONENT: docs
+================================================================================
+FILE: backend\ai-chatbot\src\main\java\com\wajahat\chatbot\lucene\DataStore.java
+COMPONENT: java-ai-chatbot
+================================================================================
+package com.wajahat.chatbot.lucene;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+public class DataStore {
+
+    public static class FAQEntry {
+        public String question;
+        public String answer;
+        public String intent;
+        public FAQEntry(String q, String a, String i) {
+            this.question = q; this.answer = a; this.intent = i;
+        }
+    }
+
+    public static List<FAQEntry> getData(String kbFilePath) {
+        List<FAQEntry> data = new ArrayList<>();
+
+        // Intent: greeting
+        data.add(new FAQEntry("hello", "Hello! I am your AI assistant. How can I help you today?", "greeting"));
+        data.add(new FAQEntry("hi", "Hi there! How can I assist you?", "greeting"));
+        
+        // Intent: technical_info
+        data.add(new FAQEntry("java", "Java is used in this chatbot's search engine.", "technical_info"));
+        data.add(new FAQEntry("lucene", "Apache Lucene is a high-performance text search engine library.", "technical_info"));
+        data.add(new FAQEntry("fastapi", "FastAPI is a modern web framework for Python.", "technical_info"));
+        
+        // Intent: order_tracking
+        data.add(new FAQEntry("where is my order", "Please provide your order ID (e.g., 12345).", "order_tracking"));
+        data.add(new FAQEntry("track my order", "Just give me your order ID and I'll look it up.", "order_tracking"));
+        
+        // Intent: support
+        data.add(new FAQEntry("bad service", "I'm sorry. I can escalate this to a manager.", "complaint"));
+        data.add(new FAQEntry("refund", "Our refund policy allows for returns within 30 days.", "refund_requests"));
+
+        // Optional: load additional FAQ entries from an external file (e.g. /app/data/faq.txt)
+        // Format per line:
+        //   question | answer
+        //   question | answer | intent
+        if (kbFilePath != null && !kbFilePath.isBlank()) {
+            File kb = new File(kbFilePath);
+            if (kb.exists() && kb.isFile()) {
+                try (BufferedReader br = new BufferedReader(new FileReader(kb, StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        String trimmed = line.trim();
+                        if (trimmed.isEmpty() || trimmed.startsWith("#")) continue;
+
+                        String[] parts = trimmed.split("\\|");
+                        if (parts.length < 2) continue;
+
+                        String question = parts[0].trim();
+                        String answer = parts[1].trim();
+                        String intent = parts.length >= 3 ? parts[2].trim() : "kb_faq";
+
+                        if (!question.isEmpty() && !answer.isEmpty()) {
+                            data.add(new FAQEntry(question, answer, intent.isEmpty() ? "kb_faq" : intent));
+                        }
+                    }
+                } catch (Exception ignored) {
+                    // If the KB file is malformed or unreadable, defaults above still keep the service functional.
+                }
+            }
+        }
+
+        return data;
+    }
+}
+
+

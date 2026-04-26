@@ -1,0 +1,20 @@
+{
+  "global_knowledge": [
+    {
+      "query": "international return policy",
+      "answer": "International returns are accepted within 45 days. Customers are responsible for international shipping costs unless the item is defective."
+    },
+    {
+      "query": "cryptocurrency payment",
+      "answer": "We currently support Bitcoin (BTC) and Ethereum (ETH) through our BitPay integration at checkout."
+    },
+    {
+      "query": "eco-friendly packaging",
+      "answer": "Yes! All our orders are shipped using 100% recycled and biodegradable materials as part of our sustainability initiative."
+    },
+    {
+      "query": "warranty details",
+      "answer": "We offer a 2-year limited warranty on all electronics, covering manufacturing defects and hardware failure."
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+FILE: docs\source_exports\docs\docs__source_exports__backend__backend__core__nlp.py.txt.txt
+COMPONENT: docs
+================================================================================
+FILE: docs\source_exports\backend\backend__core__nlp.py.txt
+COMPONENT: docs
+================================================================================
+FILE: backend\core\nlp.py
+COMPONENT: backend
+================================================================================
+import re
+import logging
+import requests
+import os
+from typing import List, Dict, Any, Optional
+
+logger = logging.getLogger(__name__)
+
+LUCENE_URL = os.getenv("LUCENE_URL", "http://lucene:4567")
+
+class EntityExtractor:
+    """Native Python Regex Extractor for rigid patterns (Order IDs, SKUs, Emails)."""
+    
+    @staticmethod
+    def extract_order_ids(text: str) -> List[str]:
+        patterns = [
+            r"ORD-\d+",
+            r"#\d+",
+            r"(?<!ORD-)(?<!#)\b\d{5,}\b"
+        ]
+        results = []
+        for p in patterns:
+            results.extend(re.findall(p, text, re.IGNORECASE))
+        return [r.upper() for r in results]
+
+    @staticmethod
+    def extract_skus(text: str) -> List[str]:
+        return re.findall(r"SKU-\d{6}", text, re.IGNORECASE)
+
+    @staticmethod
+    def extract_emails(text: str) -> List[str]:
+        return re.findall(r"[\w\.-]+@[\w\.-]+\.\w+", text)
+
+    @staticmethod
+    def extract_locations(text: str) -> List[str]:
+        """🇵🇰 Targeted Location Regex for Islamabad, Lahore, Attock, and Quetta."""
+        # Focuses on city names with word boundaries and optional prepositions
+        pattern = r"\b(Islamabad|Lahore|Attock|Quetta)\b"
+        return re.findall(pattern, text, re.IGNORECASE)
+
+class EntityResolver:
+    """Context-aware resolution and deduplication of entities."""
+    
+    @staticmethod
+    def resolve(local_entities: Dict[str, List[str]], remote_entities: Dict[str, List[str]]) -> Dict[str, List[str]]:
+        def merge_unique_and_clean(local_list, remote_list):
+            # Normalization (Uppercase) and preservation of order
+            combined = []
+            seen = set()
+            for item in (local_list + remote_list):
+                cleaned = item.strip().upper() if item.startswith("ORD-") or item.startswith("SKU-") or "#" in item else item.strip()
+                if cleaned not in seen:
+                    combined.append(cleaned)
+                    seen.add(cleaned)
+            
+            # Context-aware resolution: Remove numeric substrings 
+            # if a prefixed ID is already present (e.g., if ORD-12345 exists, remove 12345)
+            final_list = []
+            for item in combined:
+                is_substring = False
+                if item.isdigit():
+                    for other in combined:
+                        if item != other and item in other:
+                            is_substring = True
+                            break
+                if not is_substring:
+                    final_list.append(item)
+            return final_list
+
+        return {
+            "order_ids": merge_unique_and_clean(local_entities["order_ids"], remote_entities.get("order_ids", [])),
+            "skus": merge_unique_and_clean(local_entities.get("skus", []), remote_entities.get("skus", [])),
+            "locations": merge_unique_and_clean(local_entities.get("locations", []), remote_entities.get("locations", [])),
+            "names": remote_entities.get("names", []),
+            "products": merge_unique_and_clean([], remote_entities.get("products", [])),
+            "emails": local_entities.get("emails", [])
+        }
+
+class HybridNLPEngine:
+    """Orchestrates Python's rigid regex and Java's probabilistic NLP."""
+    
+    @staticmethod
+    def process_query(query: str) -> Dict[str, Any]:
+        # 1. Rigid Python Extraction (High Confidence)
+        local_entities = {
+            "order_ids": EntityExtractor.extract_order_ids(query),
+            "skus": EntityExtractor.extract_skus(query),
+            "emails": EntityExtractor.extract_emails(query),
+            "locations": EntityExtractor.extract_locations(query)
+        }
+        
+        # 2. Remote Intelligence (OpenNLP + Lucene)
+        lucene_data = {}
+        try:
+            resp = requests.post(f"{LUCENE_URL}/search", json={"query": query}, timeout=4)
+            lucene_data = resp.json()
+        except Exception as e:
+            logger.error(f"❌ Lucene/NLP Connectivity Issue: {e}")
+            lucene_data = {"intent": "unknown", "hits": [], "nlp_metadata": {}}
+
+        remote_info = lucene_data.get("nlp_metadata", {})
+        remote_entities = remote_info.get("entities", {})
+
+        # 3. Intelligent Resolution & Normalization
+        resolved_entities = EntityResolver.resolve(local_entities, remote_entities)
+
+        return {
+            "intent": lucene_data.get("intent", "unknown"),
+            "hits": lucene_data.get("hits", []),
+            "entities": resolved_entities,
+            # Java service returns top-level "confidence" and also echoes it in nlp_metadata.
+            "confidence": float(lucene_data.get("confidence", remote_info.get("confidence", 0.0)) or 0.0)
+        }
+
+
+

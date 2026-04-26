@@ -1,0 +1,190 @@
+package com.wajahat.chatbot;
+
+/**
+ * NLPProcessor: Core NLP engine for the chatbot.
+ * 
+ * Enhanced with SKU extraction and Confidence Scoring for Production.
+ */
+import opennlp.tools.doccat.*;
+import opennlp.tools.namefind.NameFinderME;
+import opennlp.tools.namefind.TokenNameFinderModel;
+import opennlp.tools.tokenize.TokenizerME;
+import opennlp.tools.tokenize.TokenizerModel;
+import opennlp.tools.util.*;
+import opennlp.tools.util.model.ModelUtil;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import com.google.gson.*;
+
+public class NLPProcessor {
+    private static final Logger logger = Logger.getLogger(NLPProcessor.class.getName());
+    
+    private TokenizerME tokenizer;
+    private NameFinderME personFinder;
+    private DocumentCategorizerME docCategorizer;
+    private boolean modelsLoaded = false;
+
+    private List<String> products = Arrays.asList(
+        "laptop", "phone", "tablet", "monitor", "keyboard", "mouse", "accessory",
+        "computer", "notebook", "iphone", "android", "macbook"
+    );
+
+    /** Represents a categorization result with confidence. */
+    public static class IntentResult {
+        public String category;
+        public double confidence;
+        public IntentResult(String category, double confidence) {
+            this.category = category;
+            this.confidence = confidence;
+        }
+    }
+
+    public NLPProcessor() {
+        String modelsPath = System.getenv("MODELS_DIR");
+        if (modelsPath == null) modelsPath = "/app/data/models";
+        loadModels(modelsPath);
+    }
+
+    private void loadModels(String path) {
+        try {
+            File tokenModelFile = new File(path, "en-token.bin");
+            File personModelFile = new File(path, "en-ner-person.bin");
+            File intentModelFile = new File(path, "en-intent.bin");
+
+            if (tokenModelFile.exists()) {
+                try (InputStream modelIn = new FileInputStream(tokenModelFile)) {
+                    this.tokenizer = new TokenizerME(new TokenizerModel(modelIn));
+                }
+            }
+
+            if (personModelFile.exists()) {
+                try (InputStream modelIn = new FileInputStream(personModelFile)) {
+                    this.personFinder = new NameFinderME(new TokenNameFinderModel(modelIn));
+                }
+            }
+
+            if (intentModelFile.exists()) {
+                try (InputStream modelIn = new FileInputStream(intentModelFile)) {
+                    this.docCategorizer = new DocumentCategorizerME(new DoccatModel(modelIn));
+                    logger.info("OpenNLP Intent Model loaded.");
+                }
+            }
+            if (this.tokenizer != null || this.docCategorizer != null || this.personFinder != null) {
+                this.modelsLoaded = true;
+            }
+
+        } catch (Exception e) {
+            logger.severe("❌ Error loading NLP models: " + e.getMessage());
+        }
+    }
+
+    public String[] tokenize(String text) {
+        if (!modelsLoaded || text == null) return text != null ? text.split("\\s+") : new String[0];
+        return tokenizer.tokenize(text);
+    }
+
+    /**
+     * Enhanced Intent Prediction: Returns the best category and its probability.
+     */
+    public IntentResult predictIntent(String[] tokens) {
+        if (docCategorizer == null || tokens.length == 0) return new IntentResult("unknown", 0.0);
+        double[] outcomes = docCategorizer.categorize(tokens);
+        String category = docCategorizer.getBestCategory(outcomes);
+        double confidence = outcomes[docCategorizer.getIndex(category)];
+        return new IntentResult(category, confidence);
+    }
+
+    /**
+     * Extracts various entities including SKUs.
+     */
+    public Map<String, List<String>> extractEntities(String text, String[] tokens) {
+        Map<String, List<String>> entities = new HashMap<>();
+        List<String> names = new ArrayList<>();
+        List<String> orderIds = new ArrayList<>();
+        List<String> skus = new ArrayList<>();
+        List<String> foundProducts = new ArrayList<>();
+
+        if (personFinder != null && tokens != null) {
+            synchronized (personFinder) {
+                Span[] nameSpans = personFinder.find(tokens);
+                for (Span s : nameSpans) {
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = s.getStart(); i < s.getEnd(); i++) sb.append(tokens[i]).append(" ");
+                    names.add(sb.toString().trim());
+                }
+                personFinder.clearAdaptiveData();
+            }
+        }
+
+        // 1. Order ID Regex
+        // Supports: ORD-12345, #12345, and plain numbers (5+ digits)
+        Pattern orderPattern = Pattern.compile("(ORD-\\d+|#\\d+|\\b\\d{5,8}\\b)", Pattern.CASE_INSENSITIVE);
+        Matcher orderMatcher = orderPattern.matcher(text);
+        while (orderMatcher.find()) orderIds.add(orderMatcher.group(1));
+
+        // 2. SKU Regex (Product Identifiers)
+        Pattern skuPattern = Pattern.compile("(SKU-\\d{6})", Pattern.CASE_INSENSITIVE);
+        Matcher skuMatcher = skuPattern.matcher(text);
+        while (skuMatcher.find()) skus.add(skuMatcher.group(1));
+
+        // 3. 🇵🇰 Targeted Location Regex (Group 10 Parameters)
+        // Focuses on Islamabad, Lahore, Attock, and Quetta with contextual bounds.
+        Pattern locPattern = Pattern.compile(
+            "\\b(Islamabad|Lahore|Attock|Quetta|Karachi|Rawalpindi|Peshawar|Multan)\\b",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher locMatcher = locPattern.matcher(text);
+        List<String> locations = new ArrayList<>();
+        while (locMatcher.find()) locations.add(locMatcher.group(1));
+
+        // 4. Precise Product Matching (Word Boundaries)
+        for (String p : products) {
+            Pattern pPattern = Pattern.compile("\\b" + p + "\\b", Pattern.CASE_INSENSITIVE);
+            if (pPattern.matcher(text).find()) foundProducts.add(p);
+        }
+
+        entities.put("names", names);
+        entities.put("order_ids", orderIds);
+        entities.put("skus", skus);
+        entities.put("locations", locations);
+        entities.put("products", foundProducts);
+        return entities;
+    }
+
+    public void trainIntentModel(String jsonPath, String modelSavePath) throws Exception {
+        logger.info("Runtime training of OpenNLP Intent model...");
+        File jsonFile = new File(jsonPath);
+        if (!jsonFile.exists()) throw new FileNotFoundException("Training data missing.");
+
+        JsonObject jsonContent = JsonParser.parseReader(new FileReader(jsonFile)).getAsJsonObject();
+        JsonArray intents = jsonContent.getAsJsonArray("intents");
+
+        List<DocumentSample> samples = new ArrayList<>();
+        for (JsonElement element : intents) {
+            JsonObject intent = element.getAsJsonObject();
+            String tag = intent.get("tag").getAsString();
+            for (JsonElement pattern : intent.getAsJsonArray("patterns")) {
+                samples.add(new DocumentSample(tag, tokenize(pattern.getAsString())));
+            }
+        }
+
+        ObjectStream<DocumentSample> sampleStream = ObjectStreamUtils.createObjectStream(samples);
+        TrainingParameters params = ModelUtil.createDefaultTrainingParameters();
+        params.put(TrainingParameters.ITERATIONS_PARAM, 100);
+        params.put(TrainingParameters.CUTOFF_PARAM, 0);
+
+        DoccatModel model = DocumentCategorizerME.train("en", sampleStream, params, new DoccatFactory());
+        try (OutputStream modelOut = new BufferedOutputStream(new FileOutputStream(modelSavePath))) {
+            model.serialize(modelOut);
+        }
+        this.docCategorizer = new DocumentCategorizerME(model);
+        logger.info("Runtime training complete.");
+    }
+
+    public boolean isReady() { return modelsLoaded; }
+}

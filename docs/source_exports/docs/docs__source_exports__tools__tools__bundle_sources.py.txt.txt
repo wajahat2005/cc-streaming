@@ -1,0 +1,94 @@
+FILE: docs\source_exports\tools\tools__bundle_sources.py.txt
+COMPONENT: docs
+================================================================================
+FILE: tools\bundle_sources.py
+COMPONENT: tools
+================================================================================
+import os
+from pathlib import Path
+
+
+EXCLUDE_DIR_PARTS = {
+    ".git",
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    "node_modules",
+    "target",
+}
+
+INCLUDE_EXTS = {
+    ".py",
+    ".java",
+    ".xml",
+    ".yml",
+    ".yaml",
+    ".json",
+    ".txt",
+    ".md",
+    ".jsx",
+    ".js",
+    ".css",
+    ".html",
+    ".conf",
+    ".dockerignore",
+    "Dockerfile",
+}
+
+
+def should_include(path: Path) -> bool:
+    parts = set(path.parts)
+    if parts & EXCLUDE_DIR_PARTS:
+        return False
+    if path.is_dir():
+        return False
+    if path.name == "package-lock.json":
+        return False
+    if path.name == "package.json":
+        return True
+    if path.name == "docker-compose.yml":
+        return True
+    if path.name == "Dockerfile":
+        return True
+    if path.suffix in INCLUDE_EXTS:
+        return True
+    return False
+
+
+def main():
+    repo_root = Path(__file__).resolve().parents[1]
+    out_path = repo_root / "docs" / "SOURCE_BUNDLE.txt"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    files = []
+    for p in repo_root.rglob("*"):
+        if should_include(p):
+            files.append(p)
+
+    files.sort(key=lambda p: str(p).lower())
+
+    with out_path.open("w", encoding="utf-8") as out:
+        out.write("SOURCE BUNDLE (auto-generated)\n")
+        out.write(f"Root: {repo_root}\n")
+        out.write("Excluded dirs: " + ", ".join(sorted(EXCLUDE_DIR_PARTS)) + "\n")
+        out.write("\n")
+
+        for p in files:
+            rel = p.relative_to(repo_root)
+            out.write("=" * 80 + "\n")
+            out.write(f"FILE: {rel}\n")
+            out.write("=" * 80 + "\n")
+            try:
+                out.write(p.read_text(encoding="utf-8", errors="replace"))
+            except Exception as e:
+                out.write(f"[ERROR reading file: {e}]\n")
+            out.write("\n\n")
+
+    print(f"Wrote {out_path} with {len(files)} files.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+

@@ -1,0 +1,97 @@
+FILE: backend\test_orchestration.py
+COMPONENT: backend
+================================================================================
+import pytest
+from fastapi.testclient import TestClient
+from unittest.mock import patch, MagicMock
+import os
+import sys
+
+# Mocking external dependencies
+sys.modules['kafka'] = MagicMock()
+sys.modules['kafka_producer'] = MagicMock()
+sys.modules['deep_translator'] = MagicMock()
+sys.modules['textblob'] = MagicMock()
+sys.modules['redis'] = MagicMock()
+sys.modules['backoff'] = MagicMock()
+
+# Now import the app
+from main import app
+from models.session import ChatState
+
+client = TestClient(app)
+
+@patch("main.translate_to_en", return_value=("mocked message", "en"))
+@patch("main.TextBlob")
+@patch("main.send_log")
+class TestChatbotOrchestration:
+    
+    @patch("main.HybridNLPEngine.process_query")
+    def test_order_tracking_flow(self, mock_nlp, mock_log, mock_textblob, mock_translate):
+        mock_textblob.return_value.sentiment.polarity = 0
+        mock_translate.side_effect = lambda x: (x, "en")
+        
+        # 1. Ask for order tracking without ID
+        mock_nlp.return_value = {
+            "intent": "order_tracking", 
+            "entities": {"order_ids": [], "locations": [], "names": [], "skus": [], "products": [], "emails": []},
+            "hits": [],
+            "confidence": 0.9
+        }
+        response = client.post("/chat", json={"message": "track my order", "user_id": "user123"})
+        data = response.json()
+        assert "Order ID" in data["response"]
+        assert data["session_context"]["state"] == ChatState.AWAITING_ORDER_ID
+
+        # 2. Provide a numeric ID
+        mock_nlp.return_value = {
+            "intent": "unknown", 
+            "entities": {"order_ids": ["12345"], "locations": [], "names": [], "skus": [], "products": [], "emails": []},
+            "hits": [],
+            "confidence": 0.1
+        }
+        response = client.post("/chat", json={"message": "12345", "user_id": "user123"})
+        data = response.json()
+        assert "12345" in data["response"]
+        assert data["session_context"]["state"] == ChatState.IDLE
+
+    @patch("main.HybridNLPEngine.process_query")
+    def test_escalation(self, mock_nlp, mock_log, mock_textblob, mock_translate):
+        mock_textblob.return_value.sentiment.polarity = -0.95
+        mock_translate.side_effect = lambda x: (x, "en")
+        mock_nlp.return_value = {
+            "intent": "unknown", 
+            "entities": {"order_ids": [], "locations": [], "names": [], "skus": [], "products": [], "emails": []},
+            "hits": [],
+            "confidence": 0.0
+        }
+        
+        response = client.post("/chat", json={"message": "DIE BOT", "user_id": "user_angry"})
+        data = response.json()
+        assert data["intent"] == "escalation"
+        assert "specialist" in data["response"]
+
+    @patch("main.HybridNLPEngine.process_query")
+    def test_discovery_fallback(self, mock_nlp, mock_log, mock_textblob, mock_translate):
+        mock_textblob.return_value.sentiment.polarity = 0
+        mock_translate.side_effect = lambda x: (x, "en")
+        mock_nlp.return_value = {
+            "intent": "unknown", 
+            "entities": {"order_ids": [], "locations": [], "names": [], "skus": [], "products": [], "emails": []},
+            "hits": [],
+            "confidence": 0.0
+        }
+        
+        with patch("main.automated_discovery") as mock_disc:
+            mock_disc.return_value = {"answer": "Cloud is a set of servers."}
+            response = client.post("/chat", json={"message": "What is cloud?", "user_id": "user_q"})
+            data = response.json()
+            assert "knowledge base" in data["response"]
+            assert data["is_discovery"] == True
+
+if __name__ == "__main__":
+    pytest.main([__file__])
+
+if __name__ == "__main__":
+    pytest.main([__file__])
+

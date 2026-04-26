@@ -1,0 +1,68 @@
+FILE: docs\source_exports\chat-ui\chat-ui__src__App.jsx.txt
+COMPONENT: docs
+================================================================================
+FILE: chat-ui\src\App.jsx
+COMPONENT: chat-ui
+================================================================================
+import React, { useState } from 'react';
+import ChatContainer from './components/ChatContainer';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
+
+/**
+ * 🌐 App: The Root Component of the AI Chatbot Frontend.
+ * 
+ * This component coordinates the top-level layout and navigation.
+ * It manages the 'view' state to toggle between the Chat interface 
+ * and the Analytics Dashboard.
+ */
+const App = () => {
+  // 'view' state: determines which submodule is currently active
+  const [view, setView] = useState('chat'); // possible values: 'chat' or 'analytics'
+
+  return (
+    <div className="app-main-wrapper">
+      <div className="app-container">
+        
+        {/* --- Application Header --- */}
+        <header className="app-header">
+          {/* Brand Identity / Logo */}
+          <div className="brand">
+            <div className="logo-glow"></div>
+            <h1>Smart Support AI</h1>
+          </div>
+
+          {/* Navigation Controls: Implemented as a premium pill-shaped toggle */}
+          <div className="nav-pill">
+            <button 
+              className={`nav-item ${view === 'chat' ? 'active' : ''}`}
+              onClick={() => setView('chat')}
+            >
+              CHAT
+            </button>
+            <button 
+              className={`nav-item ${view === 'analytics' ? 'active' : ''}`}
+              onClick={() => setView('analytics')}
+            >
+              METRICS
+            </button>
+          </div>
+        </header>
+        
+        {/* --- Main Content Area --- */}
+        <main className="chat-window">
+          {/* Conditional Rendering based on active view state */}
+          {view === 'chat' ? (
+            <ChatContainer />
+          ) : (
+            <AnalyticsDashboard />
+          )}
+        </main>
+
+      </div>
+    </div>
+  );
+};
+
+export default App;
+
+

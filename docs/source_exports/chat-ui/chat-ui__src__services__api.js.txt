@@ -1,0 +1,32 @@
+FILE: chat-ui\src\services\api.js
+COMPONENT: chat-ui
+================================================================================
+import axios from 'axios';
+
+// API BASE URL - Using empty string for relative paths when proxied via Nginx
+// or localhost:8000 for direct development access.
+const API_BASE_URL = ''; 
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000, // 30s timeout for translations
+});
+
+export const sendMessageToBot = async (message, userId = 'user_123', lang = 'en') => {
+  try {
+    const response = await api.post('/chat', {
+      message: message,
+      user_id: userId,
+      lang: lang
+    });
+    
+    // Return full data so we can access sentiment/intent/nlp if needed
+    return response.data;
+  } catch (error) {
+    console.error("API Error:", error);
+    throw error;
+  }
+};
+
+export default api;
+

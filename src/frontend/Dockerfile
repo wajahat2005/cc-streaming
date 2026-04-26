@@ -1,0 +1,26 @@
+# ─── Build Stage ───────────────────────────────────────────────────────────
+FROM node:20.10-slim AS build
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+RUN npm run build
+
+# ─── Runtime Stage ─────────────────────────────────────────────────────────
+FROM nginx:stable-alpine
+WORKDIR /usr/share/nginx/html
+
+# Healthcheck uses wget.
+RUN apk add --no-cache wget
+
+# Copy built assets
+COPY --from=build /app/dist .
+
+# Copy nginx config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 3000
+
+CMD ["nginx", "-g", "daemon off;"]

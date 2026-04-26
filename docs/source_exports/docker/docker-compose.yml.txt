@@ -1,0 +1,126 @@
+FILE: docker-compose.yml
+COMPONENT: docker
+================================================================================
+services:
+  # ---------------- ZOOKEEPER ----------------
+  # Role: Coordinates the Kafka brokers and manages cluster state.
+  zookeeper:
+    image: wurstmeister/zookeeper
+    platform: linux/amd64
+    ports:
+      - "2181:2181"
+    networks:
+      - chatbot-net
+
+  # ---------------- KAFKA ----------------
+  # Role: Distributed message broker for real-time chat auditing and logging.
+  kafka:
+    image: wurstmeister/kafka
+    platform: linux/amd64
+    ports:
+      - "9092:9092"
+    environment:
+      # Advertised listeners tell Kafka clients where to find the broker
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Automatically create the required topic for auditing
+      KAFKA_CREATE_TOPICS: "chat_logs:1:1"
+      KAFKA_ZOOKEEPER_SESSION_TIMEOUT_MS: 30000
+    restart: always
+    depends_on:
+      - zookeeper
+    networks:
+      - chatbot-net
+
+  # ---------------- LUCENE (AI Engine) ----------------
+  # Role: Java microservice handling OpenNLP logic and Lucene Fuzzy Search.
+  lucene:
+    build:
+      context: "./backend/ai-chatbot" # Builds from the Java project folder
+    platform: linux/amd64
+    ports:
+      - "4567:4567"
+    environment:
+      - PORT=4567
+      - MODELS_DIR=/app/data/models # Internal path for OpenNLP .bin files
+    volumes:
+      # Persists models and training data across container restarts
+      - "./backend/data:/app/data"
+    networks:
+      - chatbot-net
+
+  # ---------------- BACKEND (Python/FastAPI) ----------------
+  # Role: The API gateway and business logic orchestrator.
+  backend:
+    build:
+      context: "./backend"
+    platform: linux/amd64
+    ports:
+      - "8000:8000"
+    volumes:
+      # Shared volume for auditing logs (shared with the Consumer)
+      - "chat-logs:/app/logs"
+    environment:
+      # Cloud service addresses for internal container communication
+      - LUCENE_URL=http://lucene:4567
+      - KAFKA_BROKER=kafka:9092
+      - REDIS_HOST=redis
+    depends_on:
+      - kafka
+      - lucene
+      - redis
+    networks:
+      - chatbot-net
+
+  # ---------------- REDIS (Session Store) ----------------
+  # Role: High-speed in-memory database for managing user sessions and states.
+  redis:
+    image: redis:alpine
+    platform: linux/amd64
+    ports:
+      - "6379:6379"
+    restart: always
+    networks:
+      - chatbot-net
+
+  # ---------------- FRONTEND (React) ----------------
+  # Role: The User Interface layer.
+  frontend:
+    build:
+      context: "./chat-ui"
+    platform: linux/amd64
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - chatbot-net
+
+  # ---------------- CONSUMER (Audit Worker) ----------------
+  # Role: Background worker that listens to Kafka and persists logs to disk.
+  consumer:
+    build:
+      context: "./backend"
+    platform: linux/amd64
+    command: ["python", "kafka_consumer.py"]
+    environment:
+      - KAFKA_BROKER=kafka:9092
+    volumes:
+      - "chat-logs:/app/logs"
+    depends_on:
+      - kafka
+    restart: on-failure:5
+    networks:
+      - chatbot-net
+
+# ---------------- NETWORKS ----------------
+# Creates a virtual private network for isolated container communication.
+networks:
+  chatbot-net:
+    driver: bridge
+
+# ---------------- VOLUMES ----------------
+# Named volume for persistent application data (Logs).
+volumes:
+  chat-logs:

@@ -1,0 +1,24 @@
+FILE: docs\source_exports\java-ai-chatbot\backend__ai-chatbot__Dockerfile.txt
+COMPONENT: docs
+================================================================================
+FILE: backend\ai-chatbot\Dockerfile
+COMPONENT: java-ai-chatbot
+================================================================================
+# Build stage
+FROM maven:3.9.5-eclipse-temurin-17-alpine AS build
+WORKDIR /app
+COPY pom.xml .
+RUN mvn dependency:go-offline
+COPY src ./src
+RUN mvn package -DskipTests
+
+# Run stage
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+
+COPY --from=build /app/target/app.jar app.jar
+
+EXPOSE 4567
+
+CMD ["java", "-jar", "app.jar"]
+

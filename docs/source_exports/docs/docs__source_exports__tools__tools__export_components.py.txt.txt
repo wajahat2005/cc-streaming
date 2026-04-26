@@ -1,0 +1,141 @@
+FILE: docs\source_exports\tools\tools__export_components.py.txt
+COMPONENT: docs
+================================================================================
+FILE: tools\export_components.py
+COMPONENT: tools
+================================================================================
+import re
+from pathlib import Path
+
+
+EXCLUDE_DIR_PARTS = {
+    ".git",
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    "node_modules",
+    "target",
+}
+
+EXCLUDE_FILES = {
+    "package-lock.json",
+}
+
+
+def is_excluded(path: Path) -> bool:
+    if any(part in EXCLUDE_DIR_PARTS for part in path.parts):
+        return True
+    if path.name in EXCLUDE_FILES:
+        return True
+    return False
+
+
+def component_for(rel: Path) -> str:
+    parts = rel.parts
+    if not parts:
+        return "root"
+    if parts[0] == "backend":
+        if len(parts) >= 2 and parts[1] == "ai-chatbot":
+            return "java-ai-chatbot"
+        return "backend"
+    if parts[0] == "chat-ui":
+        return "chat-ui"
+    if parts[0] == "frontend":
+        return "frontend-react-app"
+    if parts[0] == "kafka":
+        return "kafka"
+    if parts[0].startswith(".github"):
+        return "github"
+    if rel.name == "docker-compose.yml":
+        return "docker"
+    if rel.name.lower() == "readme.md" or parts[0] == "docs":
+        return "docs"
+    return parts[0]
+
+
+def safe_txt_name(rel: Path) -> str:
+    # Preserve path structure but replace illegal characters
+    s = str(rel).replace("\\", "/")
+    s = re.sub(r"[^A-Za-z0-9._/-]+", "_", s)
+    s = s.replace("/", "__")
+    return f"{s}.txt"
+
+
+def should_export(path: Path) -> bool:
+    if path.is_dir():
+        return False
+    if is_excluded(path):
+        return False
+    # Export “code/config” style files only
+    keep_names = {"Dockerfile", "docker-compose.yml"}
+    keep_exts = {
+        ".py",
+        ".java",
+        ".xml",
+        ".yml",
+        ".yaml",
+        ".json",
+        ".md",
+        ".txt",
+        ".jsx",
+        ".js",
+        ".css",
+        ".html",
+        ".conf",
+        ".dockerignore",
+        ".ps1",
+        ".sh",
+    }
+    if path.name in keep_names:
+        return True
+    if path.suffix.lower() in keep_exts:
+        return True
+    return False
+
+
+def main():
+    repo_root = Path(__file__).resolve().parents[1]
+    out_root = repo_root / "docs" / "source_exports"
+    out_root.mkdir(parents=True, exist_ok=True)
+
+    exported = 0
+    for p in repo_root.rglob("*"):
+        if not should_export(p):
+            continue
+
+        rel = p.relative_to(repo_root)
+        component = component_for(rel)
+        component_dir = out_root / component
+        component_dir.mkdir(parents=True, exist_ok=True)
+
+        out_file = component_dir / safe_txt_name(rel)
+        try:
+            content = p.read_text(encoding="utf-8", errors="replace")
+        except Exception as e:
+            content = f"[ERROR reading file: {e}]"
+
+        header = []
+        header.append(f"FILE: {rel}")
+        header.append(f"COMPONENT: {component}")
+        header.append("=" * 80)
+        out_file.write_text("\n".join(header) + "\n" + content + "\n", encoding="utf-8")
+        exported += 1
+
+    index_path = out_root / "INDEX.txt"
+    lines = ["SOURCE EXPORT INDEX", f"Root: {repo_root}", f"Exported files: {exported}", ""]
+    for component_dir in sorted([d for d in out_root.iterdir() if d.is_dir()], key=lambda d: d.name):
+        lines.append(f"[{component_dir.name}]")
+        for f in sorted(component_dir.glob("*.txt"), key=lambda x: x.name.lower()):
+            lines.append(f"  - {component_dir.name}/{f.name}")
+        lines.append("")
+    index_path.write_text("\n".join(lines), encoding="utf-8")
+
+    print(f"Exported {exported} files into {out_root}")
+    print(f"Index: {index_path}")
+
+
+if __name__ == "__main__":
+    main()
+
+
+

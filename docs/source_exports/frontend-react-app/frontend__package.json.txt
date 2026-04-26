@@ -1,0 +1,9 @@
+FILE: frontend\package.json
+COMPONENT: frontend-react-app
+================================================================================
+{
+  "dependencies": {
+    "axios": "^1.15.0"
+  }
+}
+

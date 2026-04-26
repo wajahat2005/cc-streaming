@@ -1,0 +1,100 @@
+package com.wajahat.chatbot.lucene;
+
+/**
+ * 🔍 Searcher: Logic for retrieving relevant FAQ answers from the Lucene Index.
+ * 
+ * Optimized for Hybrid Retrieval with dedicated intent boosting.
+ */
+import org.apache.lucene.document.Document;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.*;
+import org.apache.lucene.store.Directory;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class Searcher {
+
+    private Directory directory;
+
+    public Searcher(Directory directory) {
+        this.directory = directory;
+    }
+
+    /**
+     * Performs a boosted search optimized for hybrid retrieval.
+     * @param input Raw query Tokens.
+     * @param intent The predicted intent (heavy boost).
+     * @param boosters Extracted entities (standard boost).
+     * @param topK Max results.
+     */
+    public List<Map<String, Object>> search(String input, String intent, List<String> boosters, int topK) {
+        List<Map<String, Object>> hits = new ArrayList<>();
+        if (input == null || input.isEmpty()) return hits;
+
+        try (DirectoryReader reader = DirectoryReader.open(directory)) {
+            IndexSearcher searcher = new IndexSearcher(reader);
+            
+            // ─── PART 1: Fuzzy Query (Typos) ─────────────────────────────
+            String[] tokens = input.split("\\s+");
+            BooleanQuery.Builder mainBuilder = new BooleanQuery.Builder();
+
+            for (String token : tokens) {
+                if (token.length() < 2) continue;
+                mainBuilder.add(new FuzzyQuery(new Term("question", token)), BooleanClause.Occur.SHOULD);
+            }
+            Query fuzzyQuery = mainBuilder.build();
+
+            // ─── PART 2: Hybrid Boosting ──────────────────────────────────
+            BooleanQuery.Builder finalBuilder = new BooleanQuery.Builder();
+            finalBuilder.add(fuzzyQuery, BooleanClause.Occur.SHOULD);
+
+            // A. Standard Entity Boost (2.5x)
+            if (boosters != null) {
+                for (String booster : boosters) {
+                    Query bMatch = new TermQuery(new Term("question", booster.toLowerCase()));
+                    finalBuilder.add(new BoostQuery(bMatch, 2.5f), BooleanClause.Occur.SHOULD);
+                }
+            }
+
+            // B. Phrase match gets a strong boost for FAQs that closely match the query.
+            PhraseQuery.Builder phraseBuilder = new PhraseQuery.Builder();
+            int position = 0;
+            for (String token : tokens) {
+                if (token.length() < 2) continue;
+                phraseBuilder.add(new Term("question", token), position++);
+            }
+            if (position > 0) {
+                Query phraseQuery = phraseBuilder.build();
+                finalBuilder.add(new BoostQuery(phraseQuery, 4.0f), BooleanClause.Occur.SHOULD);
+            }
+
+            // C. Critical Intent Boost (5.0x) - The "Hybrid" Bridge
+            // This directly matches the ML-predicted intent against the indexed intent tag.
+            if (intent != null && !intent.equalsIgnoreCase("unknown")) {
+                Query iMatch = new TermQuery(new Term("intent", intent.toLowerCase()));
+                finalBuilder.add(new BoostQuery(iMatch, 5.0f), BooleanClause.Occur.SHOULD);
+            }
+
+            Query finalQuery = finalBuilder.build();
+            TopDocs results = searcher.search(finalQuery, topK);
+
+            for (ScoreDoc scoreDoc : results.scoreDocs) {
+                Document doc = searcher.doc(scoreDoc.doc);
+                Map<String, Object> hit = new HashMap<>();
+                hit.put("question", doc.get("question"));
+                hit.put("content", doc.get("answer"));
+                hit.put("intent", doc.get("intent"));
+                hit.put("score", scoreDoc.score);
+                hits.add(hit);
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Search Error: " + e.getMessage());
+        }
+        return hits;
+    }
+}

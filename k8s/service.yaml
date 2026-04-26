@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: chatbot-backend
+  labels:
+    app: chatbot
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+  selector:
+    app: chatbot
+    component: backend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chatbot-lucene
+  labels:
+    app: chatbot
+spec:
+  type: ClusterIP
+  ports:
+  - port: 4567
+    targetPort: 4567
+    protocol: TCP
+  selector:
+    app: chatbot
+    component: lucene
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chatbot-frontend
+  labels:
+    app: chatbot
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+  selector:
+    app: chatbot
+    component: frontend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  labels:
+    app: kafka
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9092
+    targetPort: 9092
+    protocol: TCP
+  selector:
+    app: kafka
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  labels:
+    app: zookeeper
+spec:
+  type: ClusterIP
+  ports:
+  - port: 2181
+    targetPort: 2181
+    protocol: TCP
+  selector:
+    app: zookeeper
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+  selector:
+    app: redis

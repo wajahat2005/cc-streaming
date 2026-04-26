@@ -1,0 +1,98 @@
+FILE: docs\source_exports\docs\docs__source_exports__backend__backend__test_localized_entities.py.txt.txt
+COMPONENT: docs
+================================================================================
+FILE: docs\source_exports\backend\backend__test_localized_entities.py.txt
+COMPONENT: docs
+================================================================================
+FILE: backend\test_localized_entities.py
+COMPONENT: backend
+================================================================================
+import pytest
+from fastapi.testclient import TestClient
+from unittest.mock import patch, MagicMock
+import os
+import sys
+
+# Mocking external dependencies
+sys.modules['kafka'] = MagicMock()
+sys.modules['kafka_producer'] = MagicMock()
+sys.modules['deep_translator'] = MagicMock()
+sys.modules['textblob'] = MagicMock()
+sys.modules['redis'] = MagicMock()
+sys.modules['backoff'] = MagicMock()
+
+# Now import the app
+from main import app
+from core.session import session_manager
+from models.session import ChatState
+
+client = TestClient(app)
+
+@patch("main.translate_to_en", return_value=("mocked message", "en"))
+@patch("main.TextBlob")
+@patch("main.send_log")
+class TestLocalizedEntities:
+    
+    @patch("core.nlp.requests.post")
+    def test_localized_id_resolution(self, mock_post, mock_log, mock_textblob, mock_translate):
+        mock_textblob.return_value.sentiment.polarity = 0
+        mock_translate.side_effect = lambda x: (x, "en")
+        
+        # Mock Lucene response
+        mock_post.return_value.json.return_value = {
+            "intent": "order_tracking",
+            "hits": [],
+            "nlp_metadata": {"entities": {"locations": ["Islamabad"]}}
+        }
+        
+        response = client.post("/chat", json={
+            "message": "Track ORD-12345 (order 12345) for delivery to Islamabad", 
+            "user_id": "user_pak"
+        })
+        
+        data = response.json()
+        assert data["entities"]["order_ids"] == ["ORD-12345"]
+        assert data["entities"]["locations"] == ["Islamabad"]
+        assert "Islamabad" in data["response"]
+
+    @patch("core.nlp.requests.post")
+    def test_contextual_location_memory(self, mock_post, mock_log, mock_textblob, mock_translate):
+        mock_textblob.return_value.sentiment.polarity = 0
+        mock_translate.side_effect = lambda x: (x, "en")
+        mock_post.return_value.json.return_value = {"intent": "unknown", "hits": []}
+
+        # 1. First query establishes location
+        client.post("/chat", json={
+            "message": "I'm in Lahore", 
+            "user_id": "user_context"
+        })
+        
+        # 2. Second query should remember it
+        response = client.post("/chat", json={
+            "message": "Recommend a laptop", 
+            "user_id": "user_context"
+        })
+        
+        data = response.json()
+        assert "Lahore" in data["response"]
+
+    @patch("core.nlp.requests.post")
+    def test_pakistani_city_bounds(self, mock_post, mock_log, mock_textblob, mock_translate):
+        mock_textblob.return_value.sentiment.polarity = 0
+        mock_translate.side_effect = lambda x: (x, "en")
+        mock_post.return_value.json.return_value = {"intent": "unknown", "hits": []}
+
+        # Test Attock and Quetta
+        response = client.post("/chat", json={
+            "message": "Is shipping available to Attock and Quetta?", 
+            "user_id": "user_pak2"
+        })
+        data = response.json()
+        assert "Attock" in data["entities"]["locations"]
+        assert "Quetta" in data["entities"]["locations"]
+
+if __name__ == "__main__":
+    pytest.main([__file__])
+
+
+

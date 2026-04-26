@@ -1,0 +1,7 @@
+FILE: frontend\react-app\public\robots.txt
+COMPONENT: frontend-react-app
+================================================================================
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Disallow:
+

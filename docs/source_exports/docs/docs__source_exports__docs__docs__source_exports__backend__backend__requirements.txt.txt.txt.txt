@@ -1,0 +1,26 @@
+FILE: docs\source_exports\docs\docs__source_exports__backend__backend__requirements.txt.txt.txt
+COMPONENT: docs
+================================================================================
+FILE: docs\source_exports\backend\backend__requirements.txt.txt
+COMPONENT: docs
+================================================================================
+FILE: backend\requirements.txt
+COMPONENT: backend
+================================================================================
+fastapi==0.104.1
+uvicorn[standard]==0.24.0.post1
+pydantic==2.5.2
+requests==2.31.0
+textblob==0.17.1
+kafka-python==2.0.2
+scikit-learn==1.3.2
+pandas==2.1.3
+python-multipart==0.0.6
+aiohttp==3.9.1
+deep-translator==1.11.4
+redis==5.0.1
+backoff==2.2.1
+langdetect==1.0.9
+
+
+

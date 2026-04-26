@@ -156,10 +156,8 @@ Add screenshots here for your report/demo:
 
 ## Contributors
 - **Group 10**
-  - Alice Smith (Roll No: 1001) - Backend & ML
-  - Bob Jones (Roll No: 1002) - Frontend & UI
-  - Charlie Brown (Roll No: 1003) - Infrastructure & Kafka
-
+  - M wajahat
+  - Shayan Afzal
 ---
 
 ## License

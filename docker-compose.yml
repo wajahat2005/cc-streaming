@@ -1,60 +1,68 @@
 services:
-  # ---------------- ZOOKEEPER ----------------
-  # Role: Coordinates the Kafka brokers and manages cluster state.
-  zookeeper:
-    image: wurstmeister/zookeeper
-    platform: linux/amd64
-    ports:
-      - "2181:2181"
-    healthcheck:
-      test: ["CMD", "sh", "-lc", "/opt/zookeeper-3.4.13/bin/zkServer.sh status | grep -q Mode"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-    networks:
-      - chatbot-net
-
-  # ---------------- KAFKA ----------------
+  # ---------------- KAFKA (KRaft mode — no Zookeeper) ----------------
   # Role: Distributed message broker for real-time chat auditing and logging.
+  # apache/kafka:latest is the official ASF image, multi-arch (amd64 + arm64),
+  # runs in KRaft mode — no Zookeeper container needed.
   kafka:
-    image: wurstmeister/kafka
-    platform: linux/amd64
+    image: apache/kafka:latest
     ports:
       - "9092:9092"
     environment:
-      # Advertised listeners tell Kafka clients where to find the broker
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      # Automatically create the required topic for auditing
-      KAFKA_CREATE_TOPICS: "chat_logs:1:1"
-      KAFKA_ZOOKEEPER_SESSION_TIMEOUT_MS: 30000
-    restart: always
-    depends_on:
-      zookeeper:
-        condition: service_healthy
+      # ── KRaft cluster identity ─────────────────────────────────────
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      # ── Listeners ──────────────────────────────────────────────────
+      KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      # ── Reliability ────────────────────────────────────────────────
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD", "sh", "-lc", "nc -z 127.0.0.1 9092"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "127.0.0.1:9092", "--list"]
+      interval: 15s
+      timeout: 10s
       retries: 12
+    restart: always
+    networks:
+      - chatbot-net
+
+  # ---------------- KAFKA INIT (Topic Creator) ----------------
+  # Role: One-shot container that explicitly creates the chat_logs topic on first boot.
+  kafka-init:
+    image: apache/kafka:latest
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create \
+          --if-not-exists --topic chat_logs --partitions 1 --replication-factor 1
+        echo "Topic chat_logs is ready."
     networks:
       - chatbot-net
 
   # ---------------- LUCENE (AI Engine) ----------------
   # Role: Java microservice handling OpenNLP logic and Lucene Fuzzy Search.
+  # eclipse-temurin:17-jre-alpine is a multi-arch image (amd64 + arm64).
   lucene:
     build:
-      context: "./src/ai-chatbot" # Builds from the Java project folder
-    platform: linux/amd64
+      context: "./src/ai-chatbot"
     ports:
       - "4567:4567"
     environment:
       - PORT=4567
-      - MODELS_DIR=/app/data/models # Internal path for OpenNLP .bin files
+      - MODELS_DIR=/app/data/models
       - KB_FILE=/app/data/faq.txt
     volumes:
-      # Persists models and training data across container restarts
       - "./src/backend/data:/app/data"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4567/health"]
@@ -67,17 +75,15 @@ services:
 
   # ---------------- BACKEND (Python/FastAPI) ----------------
   # Role: The API gateway and business logic orchestrator.
+  # python:3.11-slim is a multi-arch image (amd64 + arm64).
   backend:
     build:
       context: "./src/backend"
-    platform: linux/amd64
     ports:
       - "8000:8000"
     volumes:
-      # Shared volume for auditing logs (shared with the Consumer)
       - "chat-logs:/app/logs"
     environment:
-      # Cloud service addresses for internal container communication
       - LUCENE_URL=http://lucene:4567
       - KAFKA_BROKER=kafka:9092
       - REDIS_HOST=redis
@@ -103,9 +109,9 @@ services:
 
   # ---------------- REDIS (Session Store) ----------------
   # Role: High-speed in-memory database for managing user sessions and states.
+  # redis:alpine is a multi-arch image (amd64 + arm64).
   redis:
     image: redis:alpine
-    platform: linux/amd64
     ports:
       - "6379:6379"
     restart: always
@@ -118,11 +124,11 @@ services:
       - chatbot-net
 
   # ---------------- FRONTEND (React) ----------------
-  # Role: The User Interface layer.
+  # Role: The User Interface layer (Instagram-style DM UI).
+  # node:20.10-slim and nginx:stable-alpine are both multi-arch images.
   frontend:
     build:
       context: "./src/frontend"
-    platform: linux/amd64
     ports:
       - "3000:3000"
     depends_on:
@@ -142,7 +148,6 @@ services:
   consumer:
     build:
       context: "./src/backend"
-    platform: linux/amd64
     command: ["python", "kafka_consumer.py"]
     environment:
       - KAFKA_BROKER=kafka:9092
@@ -157,9 +162,9 @@ services:
 
   # ---------------- PROMETHEUS (Metrics Collector) ----------------
   # Role: Scrapes /metrics from the FastAPI backend for time-series storage.
+  # prom/prometheus is a multi-arch image (amd64 + arm64).
   prometheus:
     image: prom/prometheus:v2.51.0
-    platform: linux/amd64
     ports:
       - "9090:9090"
     volumes:
@@ -180,9 +185,9 @@ services:
 
   # ---------------- GRAFANA (Metrics Dashboard) ----------------
   # Role: Visualises Prometheus metrics with pre-loaded dashboards.
+  # grafana/grafana is a multi-arch image (amd64 + arm64).
   grafana:
     image: grafana/grafana:10.4.0
-    platform: linux/amd64
     ports:
       - "3001:3000"
     environment:
@@ -191,11 +196,8 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/grafana_dashboard.json
     volumes:
-      # Datasource provisioning (auto-creates Prometheus datasource)
       - "./config/monitoring/grafana_datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro"
-      # Dashboard provider config
       - "./config/monitoring/grafana_dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro"
-      # Dashboard JSON file
       - "./config/monitoring/grafana_dashboard.json:/etc/grafana/provisioning/dashboards/grafana_dashboard.json:ro"
       - grafana-data:/var/lib/grafana
     depends_on:
@@ -205,14 +207,13 @@ services:
       - chatbot-net
 
 # ---------------- NETWORKS ----------------
-# Creates a virtual private network for isolated container communication.
 networks:
   chatbot-net:
     driver: bridge
 
 # ---------------- VOLUMES ----------------
-# Named volume for persistent application data (Logs).
 volumes:
   chat-logs:
+  kafka-data:
   prometheus-data:
   grafana-data:

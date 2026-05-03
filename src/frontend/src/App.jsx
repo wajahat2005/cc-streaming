@@ -2,56 +2,63 @@ import React, { useState } from 'react';
 import ChatContainer from './components/ChatContainer';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 
-/**
- * 🌐 App: The Root Component of the AI Chatbot Frontend.
- * 
- * This component coordinates the top-level layout and navigation.
- * It manages the 'view' state to toggle between the Chat interface 
- * and the Analytics Dashboard.
- */
 const App = () => {
-  // 'view' state: determines which submodule is currently active
-  const [view, setView] = useState('chat'); // possible values: 'chat' or 'analytics'
+  const [view, setView] = useState('chat');
 
   return (
-    <div className="app-main-wrapper">
-      <div className="app-container">
+    <div id="root">
+      {/* --- Side Navigation (Instagram Rail) --- */}
+      <nav className="side-nav">
+        <div className="nav-logo" style={{ marginBottom: '20px' }}>
+          {/* Logo Removed */}
+        </div>
         
-        {/* --- Application Header --- */}
-        <header className="app-header">
-          {/* Brand Identity / Logo */}
-          <div className="brand">
-            <div className="logo-glow"></div>
-            <h1>Smart Support AI</h1>
-          </div>
+        <button 
+          className={`nav-item ${view === 'chat' ? 'active' : ''}`}
+          onClick={() => setView('chat')}
+          title="Direct Messages"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </button>
 
-          {/* Navigation Controls: Implemented as a premium pill-shaped toggle */}
-          <div className="nav-pill">
-            <button 
-              className={`nav-item ${view === 'chat' ? 'active' : ''}`}
-              onClick={() => setView('chat')}
-            >
-              CHAT
-            </button>
-            <button 
-              className={`nav-item ${view === 'analytics' ? 'active' : ''}`}
-              onClick={() => setView('analytics')}
-            >
-              METRICS
-            </button>
-          </div>
-        </header>
-        
-        {/* --- Main Content Area --- */}
-        <main className="chat-window">
-          {/* Conditional Rendering based on active view state */}
-          {view === 'chat' ? (
-            <ChatContainer />
-          ) : (
-            <AnalyticsDashboard />
-          )}
-        </main>
+        <button 
+          className={`nav-item ${view === 'analytics' ? 'active' : ''}`}
+          onClick={() => setView('analytics')}
+          title="Analytics"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M18 20V10M12 20V4M6 20v-6"></path>
+          </svg>
+        </button>
+      </nav>
 
+      <div className="app-main-wrapper">
+        <div className="app-container">
+          <header className="app-header">
+            <div className="brand">
+              <h1>Smart Support AI</h1>
+            </div>
+            <div className="header-actions">
+              <button className="action-btn" title="More options">
+                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                   <circle cx="12" cy="12" r="1"></circle>
+                   <circle cx="12" cy="5" r="1"></circle>
+                   <circle cx="12" cy="19" r="1"></circle>
+                 </svg>
+              </button>
+            </div>
+          </header>
+          
+          <main className="chat-window">
+            {view === 'chat' ? (
+              <ChatContainer />
+            ) : (
+              <AnalyticsDashboard />
+            )}
+          </main>
+        </div>
       </div>
     </div>
   );

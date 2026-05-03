@@ -120,6 +120,12 @@ class HybridNLPEngine:
             if len(q.split()) < 7: # Keep it for short greetings only
                 return "greeting"
 
+        # 🟢 2.1 GOODBYE / THANKS (Hardcoded for reliability)
+        if any(x in q for x in ["bye", "goodbye", "see you", "adios", "farewell", "night", "exit", "stop"]):
+            return "goodbye"
+        if any(x in q for x in ["thanks", "thank you", "appreciate", "thx", "tysm", "shukriya", "jazakallah", "gracias"]):
+            return "thanks"
+
         # 🟢 3. CAPABILITIES (Hard Intent)
         if any(x in q for x in ["what can you do", "features", "capabilities", "services", "help", "assist", "how to"]):
             return "capabilities"
@@ -137,8 +143,8 @@ class HybridNLPEngine:
             return "order_tracking"
 
         # 🟢 5.5 PRODUCT DETECTION
-        product_keywords = ["laptop", "phone", "tablet", "monitor", "keyboard", "mouse", "accessory", "computer", "macbook", "iphone", "android"]
-        if any(x in q for x in product_keywords) and any(y in q for y in ["recommend", "buy", "suggest", "want", "need"]):
+        product_keywords = ["product", "item", "laptop", "phone", "tablet", "monitor", "keyboard", "mouse", "accessory", "computer", "macbook", "iphone", "android"]
+        if any(x in q for x in product_keywords) and any(y in q for y in ["recommend", "buy", "suggest", "want", "need", "show"]):
             return "product_recommendation"
 
         # 🟢 6. ML FALLBACK (Safe Mode Only)
@@ -160,7 +166,7 @@ class HybridNLPEngine:
         
         lucene_data = {}
         try:
-            resp = requests.post(f"{LUCENE_URL}/search", json={"query": query}, timeout=4)
+            resp = requests.post(f"{LUCENE_URL}/search", json={"query": query}, timeout=10)
             resp.raise_for_status()
             lucene_data = resp.json()
         except Exception as e:

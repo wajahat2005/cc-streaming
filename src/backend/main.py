@@ -26,7 +26,6 @@ from models.session import ChatState
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 APP_START_TIME = monotonic()
-REQUEST_COUNT = 0
 
 # Intent response bank for deterministic "smalltalk"/FAQ-style replies
 _INTENT_RESPONSES = {}
@@ -50,11 +49,7 @@ def response_for_intent(intent: str) -> str | None:
     return responses[0]
 
 
-ORDER_HINT_WORDS = {"order", "track", "tracking", "shipment", "shipping", "status", "parcel", "package"}
-RECOMMENDATION_HINT_WORDS = {"recommend", "suggest", "buy", "need", "want", "looking", "searching", "best"}
-PRODUCT_HINT_WORDS = {"laptop", "phone", "tablet", "monitor", "keyboard", "mouse", "accessory", "computer"}
-ESCALATION_HINT_WORDS = {"angry", "upset", "complaint", "manager", "frustrated", "terrible", "bad"}
-CAPABILITIES_HINT_WORDS = {"help", "features", "services", "capabilities", "support", "assist"}
+
 
 
 class DebugInfo(BaseModel):
@@ -156,11 +151,7 @@ app.add_middleware(
 )
 
 
-@app.middleware("http")
-async def metrics_middleware(request: Request, call_next):
-    global REQUEST_COUNT
-    REQUEST_COUNT += 1
-    return await call_next(request)
+
 
 class UserInput(BaseModel):
     message: str = Field(..., description="The user's raw message content.")
@@ -243,7 +234,10 @@ async def chat(input: UserInput):
         )
     elif intent == "greeting":
         response = response_for_intent("greeting") or "Hello! I'm your AI Support Assistant. How can I help you today?"
-        # Greeting is non-blocking; state is NOT modified.
+    elif intent == "goodbye":
+        response = response_for_intent("goodbye") or "Goodbye! Have a great day!"
+    elif intent == "thanks":
+        response = response_for_intent("thanks") or "You're welcome! Happy to assist."
     elif intent == "cancel":
         session.clear_state()
         response = "Okay, I've reset our conversation. How else can I help you?"
@@ -366,21 +360,4 @@ async def get_metrics():
     return AnalyticsEngine.get_metrics()
 
 
-@app.get("/metrics")
-def metrics():
-    # Lightweight JSON metrics for demo/monitoring.
-    active_sessions = len(session_manager.local_cache)
-    if session_manager._redis:
-        try:
-            active_sessions = sum(1 for _ in session_manager._redis.scan_iter(match="session:*", count=500))
-        except Exception:
-            active_sessions = len(session_manager.local_cache)
 
-    uptime_seconds = int(monotonic() - APP_START_TIME)
-    stats = {
-        "request_count": REQUEST_COUNT,
-        "active_sessions": active_sessions,
-        "uptime_seconds": uptime_seconds,
-        "redis_enabled": session_manager._redis is not None,
-    }
-    return stats

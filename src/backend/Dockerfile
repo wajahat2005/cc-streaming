@@ -1,5 +1,5 @@
-# Force x86/amd64 architecture to fix the 'exec format error'
-FROM --platform=linux/amd64 python:3.11-slim
+# Multi-arch base image: works on both amd64 (local) and arm64 (Oracle Cloud VM).
+FROM python:3.11-slim
 
 WORKDIR /app
 

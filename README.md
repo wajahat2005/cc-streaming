@@ -155,9 +155,8 @@ Add screenshots here for your report/demo:
 ---
 
 ## Contributors
-- **Group 10**
   - M wajahat
-  - Shayan Afzal
+  
 ---
 
 ## License

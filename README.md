@@ -146,11 +146,6 @@ docker compose exec backend pytest -q
 
 ---
 
-## Screenshots (Placeholder)
-Add screenshots here for your report/demo:
-- `docs/screenshots/chat-ui.png`
-- `docs/screenshots/analytics.png`
-- `docs/screenshots/docker-compose-healthy.png`
 
 ---
 
